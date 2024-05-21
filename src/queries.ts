@@ -7,7 +7,7 @@ export async function setParticipant(
   event: number
 ) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/eventsTest-participate/${event}?token=ItsMeTruffyBotDude15kk`,
+    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-participate/${event}?token=ItsMeTruffyBotDude15kk`,
     {
       method: "POST",
       headers: {
@@ -21,14 +21,14 @@ export async function setParticipant(
 
 export async function getParticipants(event: number) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/eventsTest-participants/${event}?token=ItsMeTruffyBotDude15kk`
+    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-participants/${event}?token=ItsMeTruffyBotDude15kk`
   );
   return response.json();
 }
 
 export async function getEvent(event: number) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/eventsTest-event/${event}`
+    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-event/${event}`
   );
   if (!response.ok) {
     throw new Error("Event doesn't exist");
