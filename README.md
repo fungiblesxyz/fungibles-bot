@@ -1,0 +1,2 @@
+# cs-bot
+ Contract scanner
