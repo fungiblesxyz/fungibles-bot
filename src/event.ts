@@ -18,7 +18,7 @@ let eventState: EventState = {
 };
 
 let hoursPassed = 0;
-const totalDurationHours = 3;
+const totalDurationHours = 20;
 const intervalDurationMilliseconds = 60 * 60 * 1000;
 const totalDurationMilliseconds =
   totalDurationHours * intervalDurationMilliseconds;
