@@ -1,4 +1,4 @@
-import { Bot, Context } from "grammy";
+import { Bot } from "grammy";
 import { isAddress } from "viem";
 import { setParticipant, getParticipants, getEvent } from "./queries";
 import { getStartMessage } from "./text";
@@ -18,7 +18,7 @@ let eventState: EventState = {
 };
 
 let hoursPassed = 0;
-const totalDurationHours = 20;
+let totalDurationHours = 12;
 const intervalDurationMilliseconds = 60 * 60 * 1000;
 const totalDurationMilliseconds =
   totalDurationHours * intervalDurationMilliseconds;
@@ -42,6 +42,8 @@ export function setupEvents(bot: Bot): void {
     }
 
     const index = ctx.message?.text.split(" ")[1];
+    totalDurationHours =
+      Number(ctx.message?.text.split(" ")[2]) || totalDurationHours;
     if (!index) {
       await ctx.reply("Please provide an id for the event.");
       return;
@@ -66,7 +68,8 @@ export function setupEvents(bot: Bot): void {
           caption: getStartMessage(
             Number(index),
             `${totalDurationHours} hours`,
-            eventState.event.prize
+            eventState.event.prize,
+            eventState.event.max
           ),
         }
       );
@@ -96,7 +99,8 @@ export function setupEvents(bot: Bot): void {
               caption: getStartMessage(
                 Number(index),
                 `${totalDurationHours - hoursPassed} hours remaining`,
-                eventState.event.prize
+                eventState.event.prize,
+                eventState.event.max
               ),
             }
           );
