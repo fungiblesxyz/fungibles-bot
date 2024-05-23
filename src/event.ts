@@ -20,7 +20,7 @@ let eventState: EventState = {
 let hoursPassed = 0;
 let totalDurationHours = 12;
 const intervalDurationMilliseconds = 60 * 60 * 1000;
-const totalDurationMilliseconds =
+let totalDurationMilliseconds =
   totalDurationHours * intervalDurationMilliseconds;
 
 function resetEventState(): void {
@@ -44,6 +44,8 @@ export function setupEvents(bot: Bot): void {
     const index = ctx.message?.text.split(" ")[1];
     totalDurationHours =
       Number(ctx.message?.text.split(" ")[2]) || totalDurationHours;
+    totalDurationMilliseconds =
+      totalDurationHours * intervalDurationMilliseconds;
     if (!index) {
       await ctx.reply("Please provide an id for the event.");
       return;
