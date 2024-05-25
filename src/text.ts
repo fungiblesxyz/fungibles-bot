@@ -15,7 +15,7 @@ export function getStartMessage(
 
 There are only ${max} spots available for this event! 
 
-💰 Prize pool: ${prize} TRUFFI 💰
+💰 Prize pool: ${Intl.NumberFormat().format(prize)} TRUFFI 💰
 
 🌟 Good luck! 🌟 
 `;

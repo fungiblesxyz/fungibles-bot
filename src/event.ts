@@ -64,7 +64,7 @@ export function setupEvents(bot: Bot): void {
     let eventStartedMessage;
     try {
       eventStartedMessage = await ctx.replyWithPhoto(
-        "https://www.truffi.xyz/banner.png",
+        "https://www.truffi.xyz/banner-event.png",
         {
           parse_mode: "HTML",
           caption: getStartMessage(
@@ -95,7 +95,7 @@ export function setupEvents(bot: Bot): void {
       if (hoursPassed < totalDurationHours) {
         try {
           eventStartedMessage = await ctx.replyWithPhoto(
-            "https://www.truffi.xyz/banner.png",
+            "https://www.truffi.xyz/banner-event.png",
             {
               parse_mode: "HTML",
               caption: getStartMessage(
