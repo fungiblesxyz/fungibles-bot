@@ -19,9 +19,8 @@ let eventState: EventState = {
 
 let hoursPassed = 0;
 let totalDurationHours = 12;
-const intervalDurationMilliseconds = 60 * 60 * 1000;
-let totalDurationMilliseconds =
-  totalDurationHours * intervalDurationMilliseconds;
+const oneHoursMilliseconds = 60 * 60 * 1000;
+let totalDurationMilliseconds = totalDurationHours * oneHoursMilliseconds;
 
 function resetEventState(): void {
   eventState = {
@@ -44,8 +43,7 @@ export function setupEvents(bot: Bot): void {
     const index = ctx.message?.text.split(" ")[1];
     totalDurationHours =
       Number(ctx.message?.text.split(" ")[2]) || totalDurationHours;
-    totalDurationMilliseconds =
-      totalDurationHours * intervalDurationMilliseconds;
+    totalDurationMilliseconds = totalDurationHours * oneHoursMilliseconds;
     if (!index) {
       await ctx.reply("Please provide an id for the event.");
       return;
@@ -119,7 +117,7 @@ export function setupEvents(bot: Bot): void {
       } else {
         clearInterval(intervalId);
       }
-    }, intervalDurationMilliseconds);
+    }, oneHoursMilliseconds * 4);
 
     setTimeout(async () => {
       try {

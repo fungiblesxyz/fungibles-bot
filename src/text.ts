@@ -11,7 +11,7 @@ export function getStartMessage(
 
 🌕🍄🌕🍄🌕🍄🌕🍄🌕🍄🌕
 
-<b>Reply with your ETH address to this message to participate.</b> The event will start in ${timeString} at truffi.xyz/collect/collect
+<b>Reply with your ETH address to this message to participate.</b> The event will start in ${timeString} at truffi.xyz
 
 There are only ${max} spots available for this event! 
 
