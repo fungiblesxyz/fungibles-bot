@@ -89,7 +89,7 @@ export function setupEvents(bot: Bot): void {
     };
 
     const intervalId = setInterval(async () => {
-      hoursPassed++;
+      hoursPassed = hoursPassed + 4;
       if (hoursPassed < totalDurationHours) {
         try {
           eventStartedMessage = await ctx.replyWithPhoto(
@@ -198,16 +198,11 @@ export function setupEvents(bot: Bot): void {
       const json = await response.json();
 
       if (response.status === 200) {
-        await ctx.reply(
-          `You are signed up! The event will start in ${
-            totalDurationHours - hoursPassed
-          } hours. Good luck!`,
-          {
-            reply_parameters: {
-              message_id: ctx.message.message_id,
-            },
-          }
-        );
+        await ctx.reply(`You are signed up! Good luck!`, {
+          reply_parameters: {
+            message_id: ctx.message.message_id,
+          },
+        });
       } else if (json.message === "Event is full of participants") {
         await ctx.reply(
           "The event is full. Don't worry, the next one will be soon.",
