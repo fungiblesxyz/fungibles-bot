@@ -11,11 +11,13 @@ export function getStartMessage(
 
 🌕🍄🌕🍄🌕🍄🌕🍄🌕🍄🌕
 
-<b>Reply with your ETH address to this message to participate.</b> The event will start in ${timeString} at truffi.xyz
+<b>Reply with your ETH address to this message to participate.</b>
 
-There are only ${max} spots available for this event! 
+The event will start in ${timeString}. There are only ${max} spots available for this event! 
 
-💰 Prize pool: ${Intl.NumberFormat().format(prize)} TRUFFI 💰
+💰 Prize pool: ${Intl.NumberFormat("en", { notation: "compact" }).format(
+    prize
+  )} TRUFFI 💰
 
 🌟 Good luck! 🌟 
 `;

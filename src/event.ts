@@ -1,33 +1,37 @@
 import { Bot } from "grammy";
 import { isAddress } from "viem";
-import { setParticipant, getParticipants, getEvent } from "./queries";
+import {
+  setParticipant,
+  getParticipants,
+  getEvent,
+  hasBalanceReq,
+} from "./queries";
 import { getStartMessage } from "./text";
+import { getTimeString } from "./utils";
 
 interface EventState {
   id: number;
   running: boolean;
-  messageIds: number[];
+  messageId: number;
   event: any;
+  signupEndTimestamp: number; // Timestamp for when the signup ends
 }
 
 let eventState: EventState = {
   id: 0,
   running: false,
-  messageIds: [],
+  messageId: 0,
   event: {},
+  signupEndTimestamp: 0,
 };
-
-let hoursPassed = 0;
-let totalDurationHours = 12;
-const oneHoursMilliseconds = 60 * 60 * 1000;
-let totalDurationMilliseconds = totalDurationHours * oneHoursMilliseconds;
 
 function resetEventState(): void {
   eventState = {
     id: 0,
     running: false,
-    messageIds: [],
+    messageId: 0,
     event: {},
+    signupEndTimestamp: 0,
   };
 }
 
@@ -41,20 +45,21 @@ export function setupEvents(bot: Bot): void {
     }
 
     const index = ctx.message?.text.split(" ")[1];
-    totalDurationHours =
-      Number(ctx.message?.text.split(" ")[2]) || totalDurationHours;
-    totalDurationMilliseconds = totalDurationHours * oneHoursMilliseconds;
-    if (!index) {
-      await ctx.reply("Please provide an id for the event.");
+    const signupEndTimestamp = Number(ctx.message?.text.split(" ")[2]);
+
+    if (!index || isNaN(signupEndTimestamp)) {
+      await ctx.reply(
+        "Please provide a valid event ID and a numeric timestamp for the signup end."
+      );
       return;
     }
 
     try {
       eventState.event = await getEvent(Number(index));
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       await ctx.reply(
-        "Failed to retrieve event details. Please try again later."
+        error.message || "An error occurred while fetching the event."
       );
       return;
     }
@@ -67,16 +72,16 @@ export function setupEvents(bot: Bot): void {
           parse_mode: "HTML",
           caption: getStartMessage(
             Number(index),
-            `${totalDurationHours} hours`,
+            getTimeString(signupEndTimestamp),
             eventState.event.prize,
             eventState.event.max
           ),
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       await ctx.reply(
-        "Failed to send event start message. Please try again later."
+        error.message || "An error occurred while starting the event."
       );
       return;
     }
@@ -84,86 +89,60 @@ export function setupEvents(bot: Bot): void {
     eventState = {
       id: Number(index),
       running: true,
-      messageIds: [eventStartedMessage.message_id],
+      messageId: eventStartedMessage.message_id,
       event: eventState.event,
+      signupEndTimestamp: signupEndTimestamp,
     };
 
-    const intervalId = setInterval(async () => {
-      hoursPassed = hoursPassed + 4;
-      if (hoursPassed < totalDurationHours) {
+    const delay = signupEndTimestamp - Date.now();
+    if (delay > 0) {
+      setTimeout(async () => {
         try {
-          eventStartedMessage = await ctx.replyWithPhoto(
-            "https://www.truffi.xyz/banner-event.png",
+          const { data } = await getParticipants(eventState.id);
+          if (!data || data?.length === 0) {
+            await ctx.reply(
+              "No one signed up for the event. The event will be cancelled."
+            );
+            resetEventState();
+            return;
+          }
+
+          const participantsString = data
+            .map((p: { telegram: string }) => `@${p.telegram}`)
+            .join(", ");
+          await ctx.reply(
+            `Signup ended! There were ${data.length} signups: ${participantsString}. The event will start soon. Head over to truffi.xyz`
+          );
+
+          const participantsAddresses = data.map(
+            (p: { address: string }) => p.address
+          );
+          await ctx.reply(
+            `Participants: <code>${JSON.stringify(
+              participantsAddresses
+            )}</code>`,
             {
               parse_mode: "HTML",
-              caption: getStartMessage(
-                Number(index),
-                `${totalDurationHours - hoursPassed} hours remaining`,
-                eventState.event.prize,
-                eventState.event.max
-              ),
             }
           );
-          eventState.messageIds.push(eventStartedMessage.message_id);
-        } catch (error) {
+
+          resetEventState();
+        } catch (error: any) {
           console.error(error);
-          clearInterval(intervalId);
           await ctx.reply(
-            "Failed to update event status. Please check manually."
+            error.message || "An error occurred while fetching participants."
           );
           resetEventState();
-          return;
         }
-      } else {
-        clearInterval(intervalId);
-      }
-    }, oneHoursMilliseconds * 4);
-
-    setTimeout(async () => {
-      try {
-        const { data } = await getParticipants(eventState.id);
-        if (!data || data?.length === 0) {
-          await ctx.reply(
-            "No one signed up for the event. The event will be cancelled."
-          );
-          resetEventState();
-          return;
-        }
-
-        const participantsString = data
-          .map((p: { telegram: string }) => `@${p.telegram}`)
-          .join(", ");
-        await ctx.reply(
-          `Signup ended! There were ${data.length} signups: ${participantsString}. The event will start soon. Head over to truffi.xyz`
-        );
-
-        const participantsAddresses = data.map(
-          (p: { address: string }) => p.address
-        );
-        await ctx.reply(
-          `Participants: <code>${JSON.stringify(participantsAddresses)}</code>`,
-          {
-            parse_mode: "HTML",
-          }
-        );
-
-        resetEventState();
-      } catch (error) {
-        console.error(error);
-        await ctx.reply(
-          "Failed to finalize the event signup. Please try again later."
-        );
-        resetEventState();
-      }
-    }, totalDurationMilliseconds);
+      }, delay);
+    } else {
+      await ctx.reply("The signup end timestamp provided has already passed.");
+      resetEventState();
+    }
   });
 
   bot.on("message:text", async (ctx) => {
-    if (
-      !eventState.messageIds.includes(
-        ctx.message.reply_to_message?.message_id || 0
-      )
-    ) {
+    if (eventState.messageId !== ctx.message.reply_to_message?.message_id) {
       return;
     }
 
@@ -190,6 +169,20 @@ export function setupEvents(bot: Bot): void {
     }
 
     try {
+      const hasBalance = await hasBalanceReq(text);
+      if (!hasBalance) {
+        await ctx.reply(
+          'You need at least 500 TRUFFI to participate. Head over to <a href="https://app.uniswap.org/explore/tokens/base/0x2496a9AF81A87eD0b17F6edEaf4Ac57671d24f38">Uniswap</a> to get some.',
+          {
+            parse_mode: "HTML",
+            reply_parameters: {
+              message_id: ctx.message.message_id,
+            },
+          }
+        );
+        return;
+      }
+
       const response = await setParticipant(
         text,
         ctx.message.from.username,
@@ -198,11 +191,18 @@ export function setupEvents(bot: Bot): void {
       const json = await response.json();
 
       if (response.status === 200) {
-        await ctx.reply(`You are signed up! Good luck!`, {
-          reply_parameters: {
-            message_id: ctx.message.message_id,
-          },
-        });
+        await ctx.reply(
+          `You are signed up! The event will start in ${getTimeString(
+            eventState.signupEndTimestamp
+          )}.
+          
+There are ${json.data.left} spots left.`,
+          {
+            reply_parameters: {
+              message_id: ctx.message.message_id,
+            },
+          }
+        );
       } else if (json.message === "Event is full of participants") {
         await ctx.reply(
           "The event is full. Don't worry, the next one will be soon.",
@@ -213,22 +213,19 @@ export function setupEvents(bot: Bot): void {
           }
         );
       } else if (json.message === "This user is already participating") {
-        await ctx.reply("You already signed up for this event.", {
+        await ctx.reply("You are already signed up for this event.", {
           reply_parameters: {
             message_id: ctx.message.message_id,
           },
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      await ctx.reply(
-        "An error occurred while signing you up. Please try again.",
-        {
-          reply_parameters: {
-            message_id: ctx.message.message_id,
-          },
-        }
-      );
+      await ctx.reply(`${error?.message}`, {
+        reply_parameters: {
+          message_id: ctx.message.message_id,
+        },
+      });
     }
   });
 }
