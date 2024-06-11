@@ -3,18 +3,18 @@ import { isAddress } from "viem";
 import {
   setParticipant,
   getParticipants,
-  getEvent,
+  initEvent,
   hasBalanceReq,
 } from "./queries";
 import { getStartMessage } from "./text";
-import { getTimeString } from "./utils";
+import { getTimeString, isAdmin } from "./utils";
 
 interface EventState {
   id: number;
   running: boolean;
   messageId: number;
   event: any;
-  signupEndTimestamp: number; // Timestamp for when the signup ends
+  signupEndTimestamp: number;
 }
 
 let eventState: EventState = {
@@ -36,7 +36,18 @@ function resetEventState(): void {
 }
 
 export function setupEvents(bot: Bot): void {
-  bot.command("startevent", async (ctx) => {
+  bot.command("startEvent", async (ctx) => {
+    if (!ctx.chat || ctx.chat.type === "private" || !ctx.from) {
+      await ctx.reply("This command can only be used in group chats.");
+      return;
+    }
+
+    const userIsAdmin = await isAdmin(bot, ctx.from.id, ctx.chat.id);
+    if (!userIsAdmin) {
+      await ctx.reply("You need to be an admin to start an event.");
+      return;
+    }
+
     if (eventState.running) {
       await ctx.reply(
         `Event signup is currently running. Please wait for it to finish before starting a new one.`
@@ -44,40 +55,48 @@ export function setupEvents(bot: Bot): void {
       return;
     }
 
-    const index = ctx.message?.text.split(" ")[1];
-    const signupEndTimestamp = Number(ctx.message?.text.split(" ")[2]);
+    const index = Number(ctx.message?.text.split(" ")[1]);
+    const timestamp = Number(ctx.message?.text.split(" ")[2]);
+    const prize = Number(ctx.message?.text.split(" ")[3]);
+    const max = Number(ctx.message?.text.split(" ")[4]);
 
-    if (!index || isNaN(signupEndTimestamp)) {
+    if (index === undefined || !timestamp || !prize || !max) {
       await ctx.reply(
-        "Please provide a valid event ID and a numeric timestamp for the signup end."
+        "Invalid command. Please provide an index, signup end timestamp, prize, and max participants."
       );
       return;
     }
 
     try {
-      eventState.event = await getEvent(Number(index));
+      await initEvent({ index, prize, timestamp, max });
+      const { data } = await getParticipants(eventState.id);
+      eventState.event.max = max - Number(data?.length) || max;
+      eventState.event.prize = prize;
+      eventState.signupEndTimestamp = timestamp;
+      eventState.running = true;
+      eventState.id = index;
     } catch (error: any) {
       console.error(error);
       await ctx.reply(
-        error.message || "An error occurred while fetching the event."
+        error.message || "An error occurred while initializing the event."
       );
       return;
     }
 
-    let eventStartedMessage;
     try {
-      eventStartedMessage = await ctx.replyWithPhoto(
+      const response = await ctx.replyWithPhoto(
         "https://www.truffi.xyz/banner-event.png",
         {
           parse_mode: "HTML",
           caption: getStartMessage(
-            Number(index),
-            getTimeString(signupEndTimestamp),
+            index,
+            getTimeString(timestamp),
             eventState.event.prize,
             eventState.event.max
           ),
         }
       );
+      eventState.messageId = response.message_id;
     } catch (error: any) {
       console.error(error);
       await ctx.reply(
@@ -86,15 +105,7 @@ export function setupEvents(bot: Bot): void {
       return;
     }
 
-    eventState = {
-      id: Number(index),
-      running: true,
-      messageId: eventStartedMessage.message_id,
-      event: eventState.event,
-      signupEndTimestamp: signupEndTimestamp,
-    };
-
-    const delay = signupEndTimestamp - Date.now();
+    const delay = timestamp - Date.now();
     if (delay > 0) {
       setTimeout(async () => {
         try {
@@ -218,6 +229,15 @@ There are ${json.data.left} spots left.`,
             message_id: ctx.message.message_id,
           },
         });
+      } else {
+        await ctx.reply(
+          json.message || "An error occurred while signing up for the event.",
+          {
+            reply_parameters: {
+              message_id: ctx.message.message_id,
+            },
+          }
+        );
       }
     } catch (error: any) {
       console.error(error);

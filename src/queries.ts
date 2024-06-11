@@ -7,10 +7,10 @@ const TRUFFI_CONTRACT = "0x2496a9AF81A87eD0b17F6edEaf4Ac57671d24f38";
 export async function setParticipant(
   address: string,
   telegram: string,
-  event: number
+  index: number
 ) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-participate/${event}?token=ItsMeTruffyBotDude15kk`,
+    `${process.env.EVENTS_API_URL}-participate/${index}?token=ItsMeTruffyBotDude15kk`,
     {
       method: "POST",
       headers: {
@@ -34,25 +34,39 @@ export async function hasBalanceReq(address: string) {
   return true;
 }
 
-export async function getParticipants(event: number) {
+export async function getParticipants(index: number) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-participants/${event}?token=ItsMeTruffyBotDude15kk`
+    `${process.env.EVENTS_API_URL}-participants/${index}?token=ItsMeTruffyBotDude15kk`
   );
   return response.json();
 }
 
-export async function getEvent(event: number) {
+export async function initEvent({
+  index,
+  prize,
+  timestamp,
+  max,
+}: {
+  index: number;
+  prize: number;
+  timestamp: number;
+  max: number;
+}) {
   const response = await fetch(
-    `https://asia-southeast1-shrooms-9823a.cloudfunctions.net/events-event/${event}`
+    `${process.env.EVENTS_API_URL}-init/${index}?token=ItsMeTruffyBotDude15kk`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ index, prize, timestamp, max }),
+    }
   );
-  if (!response.ok) {
-    throw new Error("Event doesn't exist");
-  }
   const json = await response.json();
 
-  if (json.data.event?.end !== 0) {
-    throw new Error("Event is already running");
+  if (!response.ok) {
+    throw new Error(json.message);
   }
 
-  return json.data.event;
+  return json;
 }

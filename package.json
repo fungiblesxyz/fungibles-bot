@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
+    "dev:test": "dotenv -e .env.test nodemon --exec ts-node src/index.ts",
     "start": "node src/build/index.js",
     "build": "tsc"
   },

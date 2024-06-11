@@ -7,18 +7,20 @@ export function getStartMessage(
   return `
 🌕🍄🌕🍄🌕🍄🌕🍄🌕🍄🌕
 
-<b>Truffi Community Event ${Number(index) + 1} Signup!</b>
+<b> Welcome to the Truffi Community Event ${Number(index) + 1}! </b>
 
 🌕🍄🌕🍄🌕🍄🌕🍄🌕🍄🌕
 
-<b>Reply with your ETH address to this message to participate.</b>
+<b>🚀 How to Join:</b> Reply to this message with your ETH address to sign up!
 
-The event will start in ${timeString}. There are only ${max} spots available for this event! 
+🕒 <b>Countdown:</b> The event kicks off in ${timeString}.
 
-💰 Prize pool: ${Intl.NumberFormat("en", { notation: "compact" }).format(
+👥 <b>Spots Available:</b> Hurry, only ${max} spots left!
+
+💰 <b>Prize Pool:</b> ${Intl.NumberFormat("en", { notation: "compact" }).format(
     prize
   )} TRUFFI 💰
 
-🌟 Good luck! 🌟 
+🍀 <b>Good Luck & Have Fun!</b> 🍀
 `;
 }
