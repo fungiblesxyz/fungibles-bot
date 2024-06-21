@@ -28,7 +28,7 @@ export async function hasBalanceReq(address: string) {
   );
   const { result } = await response.json();
 
-  if (parseUnits(result, 9) < 500) {
+  if (parseUnits(result, 9) < 3500) {
     return false;
   }
   return true;
