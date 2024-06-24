@@ -1,3 +1,5 @@
+import { formatNumber } from "./utils";
+
 export function getStartMessage(
   index: number,
   timeString: string,
@@ -13,9 +15,7 @@ export function getStartMessage(
 
 <b>🚀 How to Join:</b> Reply to this message with your ETH address to participate in the Hunt!
 
-💰 <b>Potential Prize Pool:</b> ${Intl.NumberFormat("en", {
-    notation: "compact",
-  }).format(prize)} TRUFFI 💰
+💰 <b>Potential Prize Pool:</b> ${formatNumber(prize)} TRUFFI 💰
 
 🍀 <b>Good Luck & Have Fun!</b> 🍀
 `;

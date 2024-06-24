@@ -41,27 +41,8 @@ export async function getParticipants(index: number) {
   return response.json();
 }
 
-export async function initEvent({
-  index,
-  prize,
-  timestamp,
-  max,
-}: {
-  index: number;
-  prize: number;
-  timestamp: number;
-  max: number;
-}) {
-  const response = await fetch(
-    `${process.env.EVENTS_API_URL}-init/${index}?token=ItsMeTruffyBotDude15kk`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ index, prize, timestamp, max }),
-    }
-  );
+export async function getStats(index: number) {
+  const response = await fetch(`${process.env.EVENTS_API_URL}-stats/${index}`);
   const json = await response.json();
 
   if (!response.ok) {

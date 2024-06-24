@@ -1,8 +1,13 @@
 import { Bot } from "grammy";
 import { isAddress } from "viem";
-import { setParticipant, getParticipants, hasBalanceReq } from "./queries";
+import {
+  setParticipant,
+  getParticipants,
+  hasBalanceReq,
+  getStats,
+} from "./queries";
 import { getStartMessage } from "./text";
-import { getTimeString, isAdmin } from "./utils";
+import { getTimeString, isAdmin, formatNumber } from "./utils";
 
 interface EventState {
   id: number;
@@ -31,16 +36,23 @@ function resetEventState(): void {
 }
 
 async function huntStatus(ctx: any, left: number) {
+  const { data } = await getStats(eventState.id);
+  const stats = data.stats;
+
   if (!eventState.running) {
     await ctx.reply("There is currently no hunt.");
     return;
   }
   await ctx.reply(
     `<b>🌕🍄 Truffi Hunt Status 🌕🍄</b>
-          
-This hunt will end in ${getTimeString(eventState.end)}
 
-There are ${left} spots left.`,
+Ends in: ${getTimeString(eventState.end)}
+Spots left: ${left}
+Current Prize Pool: ${formatNumber(stats.currentPrize)} TRUFFI
+Collect so far: ${formatNumber(stats.filledSlots)}
+Average per slot: ${Number(
+      formatNumber(stats.currentPoints / stats.filledSlots)
+    ).toFixed(1)} TRUFFI`,
     {
       parse_mode: "HTML",
     }
@@ -204,7 +216,7 @@ export function setupEvents(bot: Bot): void {
             },
           }
         );
-        huntStatus(ctx, json.data.left);
+        eventState.event.max = json.data.left;
       } else if (json.message === "Event is full of participants") {
         await ctx.reply(
           "This hunt is full. Don't worry, the next one will be soon.",

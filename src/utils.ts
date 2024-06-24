@@ -27,3 +27,9 @@ export async function isAdmin(
     return false;
   }
 }
+
+export function formatNumber(number: number): string {
+  return Intl.NumberFormat("en", {
+    notation: "standard",
+  }).format(number);
+}
