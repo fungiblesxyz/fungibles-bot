@@ -6,8 +6,8 @@
   "author": "Sam <samuv.eth@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "dev:test": "dotenv -e .env.test nodemon --exec ts-node src/index.ts",
+    "dev": "nodemon --exec ts-node src/bot/index.ts",
+    "dev:test": "dotenv -e .env.test nodemon --exec ts-node src/bot/index.ts",
     "start": "node src/build/index.js",
     "build": "tsc"
   },
@@ -21,9 +21,9 @@
     "typescript-eslint": "^7.7.1"
   },
   "dependencies": {
+    "@grammyjs/conversations": "^1.2.0",
     "cron": "^3.1.7",
     "grammy": "^1.23.0",
-    "telegraf": "^4.16.3",
     "viem": "^2.10.9"
   }
 }
