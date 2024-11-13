@@ -1,25 +1,12 @@
-const UNISWAP_V2_SUBGRAPH =
-  "https://gateway.thegraph.com/api/cef233fe032b15e9a0b8edd107bdae0f/subgraphs/id/C4cSs45WiwmUqyN7WCR6rFRitEhPEXSKt3uabL2tWinu";
-const UNISWAP_V3_SUBGRAPH =
-  "https://gateway.thegraph.com/api/cef233fe032b15e9a0b8edd107bdae0f/subgraphs/id/GqzP4Xaehti8KSfQmv3ZctFSjnSUYZ4En5NRsiTbvZpz";
+import { Address, PublicClient, formatUnits } from "viem";
 
-interface V2Pool {
-  id: string;
-  token0: { symbol: string; id: string };
-  token1: { symbol: string; id: string };
-  reserveETH: string;
-  token0Price: string;
-  token1Price: string;
-}
-
-interface V3Pool {
-  id: string;
-  token0: { symbol: string; id: string };
-  token1: { symbol: string; id: string };
-  totalValueLockedETH: string;
-}
+// Constants
+const UNISWAP_V3_FACTORY = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+const WETH = "0x4200000000000000000000000000000000000006";
+const FEE_TIERS = [100, 500, 3000, 10000] as const;
 
 interface TokenInfo {
+  id: Address;
   symbol: string;
   name?: string;
   decimals?: string;
@@ -29,122 +16,128 @@ interface TokenInfo {
 interface PoolsResponse {
   info: TokenInfo;
   pools: {
-    UniswapV2?: string;
     UniswapV3?: string;
   };
 }
 
-export async function getUniswapV2Pools(
-  tokenAddress: string
-): Promise<V2Pool[]> {
-  const response = await fetch(UNISWAP_V2_SUBGRAPH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `{
-        token0Pairs: pairs(where: {token0: "${tokenAddress.toLowerCase()}"}) {
-          id
-          token0 {
-            id 
-            symbol
-            name
-            decimals
-          }
-          token1 { id }
-        }
-        token1Pairs: pairs(where: {token1: "${tokenAddress.toLowerCase()}"}) {
-          id
-          token0 { id }
-          token1 {
-            id
-            symbol
-            name
-            decimals
-          }
-        }
-      }`,
-    }),
-  });
-
-  const data = await response.json();
-  return [...(data.data?.token0Pairs || []), ...(data.data?.token1Pairs || [])];
-}
-
-export async function getUniswapV3Pools(
-  tokenAddress: string
-): Promise<V3Pool[]> {
-  const response = await fetch(UNISWAP_V3_SUBGRAPH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `{
-        token0Pools: pools(where: {token0: "${tokenAddress.toLowerCase()}"}) {
-          id
-          token0 { 
-            id
-            symbol
-            name
-            decimals
-          }
-          token1 { id }
-        }
-        token1Pools: pools(where: {token1: "${tokenAddress.toLowerCase()}"}) {
-          id
-          token0 { id }
-          token1 { 
-            id
-            symbol
-            name
-            decimals
-          }
-        }
-      }`,
-    }),
-  });
-
-  const data = await response.json();
-  return [...(data.data?.token0Pools || []), ...(data.data?.token1Pools || [])];
-}
-
 export async function getPools(
-  tokenAddress: string
+  tokenAddress: Address,
+  publicClient: PublicClient
 ): Promise<PoolsResponse | null> {
-  const WETH = "0x4200000000000000000000000000000000000006";
-  const [v2Pairs, v3Pools] = await Promise.all([
-    getUniswapV2Pools(tokenAddress),
-    getUniswapV3Pools(tokenAddress),
+  // Get V3 pools for all fee tiers
+  const v3PoolPromises = FEE_TIERS.map((fee) =>
+    publicClient.readContract({
+      address: UNISWAP_V3_FACTORY,
+      abi: [
+        {
+          inputs: [
+            { type: "address" },
+            { type: "address" },
+            { type: "uint24" },
+          ],
+          name: "getPool",
+          outputs: [{ type: "address" }],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      functionName: "getPool",
+      args: [tokenAddress, WETH, fee],
+    })
+  );
+
+  const [tokenInfo, ...v3Pools] = await Promise.all([
+    getTokenInfo(tokenAddress, publicClient),
+    ...v3PoolPromises,
   ]);
 
-  // Combine and filter V2 pairs
-  const wethV2Pair = v2Pairs.find(
-    (pair) =>
-      pair.token0.id?.toLowerCase() === WETH ||
-      pair.token1.id?.toLowerCase() === WETH
+  // Find first non-zero V3 pool
+  const v3Pool = v3Pools.find(
+    (pool) => pool !== "0x0000000000000000000000000000000000000000"
   );
 
-  // Combine and filter V3 pools
-  const wethV3Pool = v3Pools.find(
-    (pool) =>
-      pool.token0.id?.toLowerCase() === WETH ||
-      pool.token1.id?.toLowerCase() === WETH
-  );
-
-  if (!wethV2Pair && !wethV3Pool) return null;
-
-  const tokenInfo: TokenInfo = (wethV3Pool &&
-  wethV3Pool.token0.id.toLowerCase() === tokenAddress.toLowerCase()
-    ? wethV3Pool.token0
-    : wethV3Pool?.token1) ||
-    (wethV2Pair &&
-    wethV2Pair.token0.id.toLowerCase() === tokenAddress.toLowerCase()
-      ? wethV2Pair.token0
-      : wethV2Pair?.token1) || { symbol: "UNKNOWN" };
+  // If no pools exist, return null
+  if (!v3Pool) {
+    return null;
+  }
 
   return {
     info: tokenInfo,
     pools: {
-      UniswapV2: wethV2Pair?.id,
-      UniswapV3: wethV3Pool?.id,
+      UniswapV3: v3Pool,
     },
   };
+}
+
+async function getTokenInfo(
+  tokenAddress: Address,
+  publicClient: PublicClient
+): Promise<TokenInfo> {
+  try {
+    const [symbol, name, decimals, totalSupply] = await Promise.all([
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: [
+          {
+            inputs: [],
+            name: "symbol",
+            outputs: [{ type: "string" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "symbol",
+      }),
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: [
+          {
+            inputs: [],
+            name: "name",
+            outputs: [{ type: "string" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "name",
+      }),
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: [
+          {
+            inputs: [],
+            name: "decimals",
+            outputs: [{ type: "uint8" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "decimals",
+      }),
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: [
+          {
+            inputs: [],
+            name: "totalSupply",
+            outputs: [{ type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "totalSupply",
+      }),
+    ]);
+
+    return {
+      id: tokenAddress,
+      symbol,
+      name,
+      decimals: decimals.toString(),
+      totalSupply: formatUnits(totalSupply, decimals),
+    };
+  } catch (error) {
+    console.error("Error fetching token info:", error);
+    return { id: tokenAddress, symbol: "UNKNOWN" };
+  }
 }

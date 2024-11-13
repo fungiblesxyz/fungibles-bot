@@ -1,13 +1,17 @@
-import { Bot, InlineKeyboard, type Context } from "grammy";
+import { Bot, InlineKeyboard, type Context, InputFile } from "grammy";
 import { getAddress, isAddress } from "viem";
 import { getPools } from "./pools";
+import { shortenAddress } from "../utils";
+import client from "../client";
 
 require("dotenv").config();
 
 // async function test() {
-//   const Pools = await getPools("0x7d9CE55D54FF3FEddb611fC63fF63ec01F26D15F");
-
-//   console.log("Uniswap Pools:", JSON.stringify(Pools, null, 2));
+//   const tokenData = await getPools(
+//     "0x7d9CE55D54FF3FEddb611fC63fF63ec01F26D15F",
+//     client
+//   );
+//   console.log("🚀 ~ getAddressConversation ~ tokenData:", tokenData);
 // }
 
 // test();
@@ -18,9 +22,31 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
-const pendingTokenAddresses = new Map<number, string>();
 
-bot.start();
+// Define the action types once
+type ActionType = "token" | "emoji" | "image";
+
+// Replace the simple pending map with a more detailed structure
+interface PendingAction {
+  chatId: string;
+  action: ActionType;
+  promptMessage: string;
+}
+const pendingActions = new Map<number, PendingAction>();
+
+// Add error handling for bot startup
+try {
+  bot.start().catch((err) => {
+    if (err.error_code === 409) {
+      console.warn("Warning: Another bot instance may be running");
+    } else {
+      console.error("Bot startup error:", err);
+    }
+  });
+} catch (err) {
+  console.error("Failed to start bot:", err);
+}
+
 bot.command("start", handleStartCommand);
 
 bot.on("callback_query:data", async (ctx) => {
@@ -31,14 +57,14 @@ bot.on("callback_query:data", async (ctx) => {
   }
 
   if (callbackData === "cancel") {
-    pendingTokenAddresses.delete(ctx.from.id);
+    pendingActions.delete(ctx.from.id);
     return ctx.editMessageText(
       "✔️ Operation cancelled!\n\nDo /start if you want to do something else."
     );
   }
 
   if (callbackData.startsWith("chat-edit_")) {
-    const chatId = callbackData.replace("chat-edit_", "");
+    const [chatId] = callbackData.replace("chat-edit_", "").split("_");
     return handleChatEditCallback(ctx, chatId);
   }
 
@@ -53,10 +79,17 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.on("my_chat_member", handleChatMemberUpdate);
 bot.on("message:text", async (ctx) => {
-  const pendingChatId = pendingTokenAddresses.get(ctx.from.id);
+  const pendingAction = pendingActions.get(ctx.from.id);
 
-  if (pendingChatId) {
-    return getAddressConversation(ctx, pendingChatId);
+  if (pendingAction) {
+    switch (pendingAction.action) {
+      case "token":
+        return handleTokenUpdate(ctx, pendingAction.chatId);
+      case "emoji":
+        return handleEmojiUpdate(ctx, pendingAction.chatId);
+      case "image":
+        return handleImageUpdate(ctx, pendingAction.chatId);
+    }
   }
 });
 
@@ -89,8 +122,7 @@ async function fetchChatData(chatId: string) {
     .then((json) => json.data);
 }
 
-async function getAddressConversation(ctx: Context, chatId: string) {
-  console.log("🚀 ~ getAddressConversation ~ chatId:", chatId);
+async function handleTokenUpdate(ctx: Context, chatId: string) {
   const text = ctx.message?.text?.trim().toLowerCase() ?? "";
 
   if (!isAddress(text)) {
@@ -102,7 +134,7 @@ async function getAddressConversation(ctx: Context, chatId: string) {
   const address = getAddress(text);
 
   try {
-    const tokenData = await getPools(address);
+    const tokenData = await getPools(address, client);
 
     if (!tokenData) {
       return ctx.reply(
@@ -115,7 +147,7 @@ async function getAddressConversation(ctx: Context, chatId: string) {
 
     const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
       method: "PATCH",
-      body: JSON.stringify({ ...tokenData, token: address }),
+      body: JSON.stringify({ ...tokenData }),
       headers: {
         "Content-Type": "application/json",
       },
@@ -131,12 +163,72 @@ async function getAddressConversation(ctx: Context, chatId: string) {
       return;
     }
 
-    pendingTokenAddresses.delete(ctx.from?.id!);
+    pendingActions.delete(ctx.from?.id!);
     await ctx.reply("✅ Token address saved successfully!");
   } catch (error) {
     console.error("❌ Token update error:", error);
     await ctx.reply("❌ Failed to save token address. Please try again later.");
     return;
+  }
+}
+
+async function handleEmojiUpdate(ctx: Context, chatId: string) {
+  const emoji = ctx.message?.text?.trim() ?? "";
+
+  try {
+    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings: { emoji } }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      await ctx.reply("❌ Failed to update emoji");
+      return;
+    }
+
+    pendingActions.delete(ctx.from?.id!);
+    await ctx.reply("✅ Emoji updated successfully!");
+  } catch (error) {
+    console.error("❌ Emoji update error:", error);
+    await ctx.reply("❌ Failed to update emoji. Please try again later.");
+  }
+}
+
+async function handleImageUpdate(ctx: Context, chatId: string) {
+  const imageUrl = ctx.message?.text?.trim() ?? "";
+
+  // Basic URL validation
+  if (!imageUrl.match(/^https?:\/\/.+/i)) {
+    return ctx.reply(
+      "❌ Please provide a valid image URL starting with http:// or https://",
+      {
+        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+      }
+    );
+  }
+
+  try {
+    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings: { imageUrl } }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      await ctx.reply("❌ Failed to update image URL");
+      return;
+    }
+
+    pendingActions.delete(ctx.from?.id!);
+    await ctx.reply("✅ Image URL updated successfully!");
+  } catch (error) {
+    console.error("❌ Image URL update error:", error);
+    await ctx.reply("❌ Failed to update image URL. Please try again later.");
   }
 }
 
@@ -173,17 +265,24 @@ async function handleSettingsCallback(ctx: Context) {
 
 async function handleChatEditCallback(ctx: Context, chatId: string) {
   if (!ctx.from) return;
-  pendingTokenAddresses.set(ctx.from.id, chatId);
-  await ctx.editMessageText("➡️ Send your token address", {
+
+  const [, , action] = ctx.callbackQuery?.data?.split("_") ?? [];
+
+  const prompts: Record<ActionType, string> = {
+    token: "➡️ Send your token address",
+    emoji: "➡️ Send your preferred emoji",
+    image: "➡️ Send your image URL (must start with http:// or https://)",
+  };
+
+  pendingActions.set(ctx.from.id, {
+    chatId,
+    action: action as ActionType,
+    promptMessage: prompts[action as ActionType],
+  });
+
+  await ctx.editMessageText(prompts[action as ActionType], {
     reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
   });
-}
-
-function shortenAddress(address: string, includeLink = false): string {
-  const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;
-  return includeLink
-    ? `[${shortened}](https://basescan.org/address/${address})`
-    : shortened;
 }
 
 function formatPoolsInfo(pools: Record<string, string>): string {
@@ -194,7 +293,7 @@ function formatPoolsInfo(pools: Record<string, string>): string {
 
 async function handleChatCallback(ctx: Context, chatId: string) {
   const chatData = await fetchChatData(chatId);
-  if (!chatData?.token) {
+  if (!chatData?.info.id) {
     await handleChatEditCallback(ctx, chatId);
     return;
   }
@@ -203,14 +302,24 @@ async function handleChatCallback(ctx: Context, chatId: string) {
     `
 💎 Current Token Info:
 • Symbol: ${chatData.info.symbol}
-• Address: ${shortenAddress(chatData.token, true)}
+• Address: ${shortenAddress(chatData.info.id, true)}
 ${formatPoolsInfo(chatData.pools)}
 
 Select an action:`,
     {
       parse_mode: "Markdown",
       reply_markup: new InlineKeyboard()
-        .text("✏️ Edit token address", `chat-edit_${chatId}`)
+        .text("✏️ Edit token address", `chat-edit_${chatId}_token`)
+        .row()
+        .text(
+          `Emoji: ${chatData.settings?.emoji ?? "Not set"}`,
+          `chat-edit_${chatId}_emoji`
+        )
+        .row()
+        .text(
+          `🖼 ${chatData.settings?.imageUrl ? "Change" : "Set"} Image URL`,
+          `chat-edit_${chatId}_image`
+        )
         .row()
         .text("Cancel", "cancel"),
     }
@@ -242,7 +351,6 @@ async function handleStartCommand(ctx: Context) {
 }
 
 async function handleChatMemberUpdate(ctx: Context) {
-  console.log("🚀 ~ handleChatMemberUpdate ~ ctx:", ctx);
   const update = ctx.myChatMember;
   if (!update) return;
 
@@ -260,4 +368,21 @@ async function handleChatMemberUpdate(ctx: Context) {
       });
       return console.log("Removed from group");
   }
+}
+
+export function sendMessageToChat(chatId: string, message: string) {
+  return bot.api.sendMessage(chatId, message, {
+    parse_mode: "Markdown",
+  });
+}
+
+export function sendImageToChat(
+  chatId: string,
+  image: Buffer,
+  message: string
+) {
+  return bot.api.sendPhoto(chatId, new InputFile(image), {
+    caption: message,
+    parse_mode: "Markdown",
+  });
 }
