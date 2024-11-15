@@ -1,41 +1,15 @@
 import { parseAbiItem, formatUnits } from "viem";
-import { Resvg } from "@resvg/resvg-js";
-import { sendImageToChat } from "../bot";
+import { sendMediaToChat } from "../bot";
 import {
   shortenAddress,
   convertToPositive,
   _n,
   getEthUsdPrice,
   getTokenHoldersCount,
+  fetchChats,
 } from "../utils";
 import client from "../client";
-
-interface TokenInfo {
-  decimals: string;
-  id: string;
-  name: string;
-  symbol: string;
-  totalSupply: string;
-}
-
-interface Pools {
-  UniswapV2?: string;
-  UniswapV3?: string;
-}
-
-interface ChatEntry {
-  id: string;
-  info: TokenInfo;
-  pools: Pools;
-  settings?: {
-    emoji?: string;
-    imageUrl?: string;
-  };
-}
-
-interface ChatResponse {
-  [key: string]: ChatEntry;
-}
+import { ChatResponse, ChatEntry } from "../types";
 
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
@@ -44,35 +18,6 @@ const UNISWAP_V3_POOL_ABI = parseAbiItem(
 const ERC20_BALANCE_ABI = parseAbiItem(
   "function balanceOf(address) view returns (uint256)"
 );
-
-function getInscriptionABI(symbol: string) {
-  if (symbol === "TRUFFI")
-    return {
-      name: "dynamicInscription",
-      abi: "function dynamicInscription(address) view returns ((uint256 seed, uint256 extra, address creator))",
-    };
-  if (symbol === "JELLI")
-    return {
-      name: "polypsDegree",
-      abi: "function polypsDegree(address) view returns ((uint256 seed, uint256 extra))",
-    };
-  if (symbol === "FUNGI")
-    return {
-      name: "sporesDegree",
-      abi: "function sporesDegree(address) view returns ((uint256 seed, uint256 extra))",
-    };
-  return {
-    name: "dynamicInscription",
-    abi: "function dynamicInscription(address) view returns ((uint256 seed, uint256 extra))",
-  };
-}
-
-function getSvgABI(symbol: string) {
-  if (symbol === "TRUFFI") {
-    return "function getSvg((uint256 seed, uint256 extra, address creator)) view returns (string)";
-  }
-  return "function getSvg((uint256 seed, uint256 extra)) view returns (string)";
-}
 
 export async function monitorBuys() {
   const chats = await fetchChats();
@@ -102,7 +47,7 @@ export async function monitorBuys() {
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
-    fromBlock: 22338955n,
+    fromBlock: 22423693n,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);
@@ -139,12 +84,6 @@ export async function monitorBuys() {
   });
 }
 
-async function fetchChats(): Promise<ChatResponse> {
-  return fetch(process.env.CHATS_API_URL!)
-    .then((res) => res.json())
-    .then((json) => json.data);
-}
-
 async function handleBuyEvent(
   log: any,
   chats: ChatResponse,
@@ -153,17 +92,22 @@ async function handleBuyEvent(
   ethUsdPrice: number,
   holdersCounts: Record<string, number>
 ) {
+  const chat = Object.values(chats).find(
+    (chat) => chat.pools.UniswapV3?.toLowerCase() === log.address.toLowerCase()
+  );
+  if (!chat) return;
+
+  const amountInEth = Number(formatUnits(ethAmount, 18));
+  const spentAmount = amountInEth * ethUsdPrice;
+  if (chat.settings?.minBuyAmount && spentAmount < chat.settings.minBuyAmount) {
+    return;
+  }
+
   const transaction = await client.getTransaction({
     hash: log.transactionHash,
   });
 
   const actualBuyer = transaction.from;
-
-  const chat = Object.values(chats).find(
-    (chat) => chat.pools.UniswapV3?.toLowerCase() === log.address.toLowerCase()
-  );
-
-  if (!chat) return;
 
   const balance = await client.readContract({
     address: chat.info.id as `0x${string}`,
@@ -171,9 +115,11 @@ async function handleBuyEvent(
     functionName: "balanceOf",
     args: [actualBuyer],
   });
+  if (!balance) return;
 
-  const png = await getPng(chat, actualBuyer);
-  if (!png) return;
+  const image = await getBuyImage(chat);
+  console.log("🚀 ~ image:", image);
+  if (!image?.fileId || !image.type) return;
 
   const formattedBalance = formatUnits(balance, Number(chat.info.decimals));
 
@@ -187,89 +133,39 @@ async function handleBuyEvent(
   const baseEmoji = chat.settings?.emoji || "🟢";
   const emojiString = baseEmoji.repeat(emojiCount);
 
-  sendImageToChat(
+  sendMediaToChat(
     chat.id,
-    png,
+    image.fileId,
+    image.type,
     `
-*${chat.info.symbol} Buy!* 
+*${chat.info.symbol} Buy!*
 ${emojiString}
 *Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
 *Received:* ${_n(amountOut)} ${chat.info.symbol}
 *New Balance:* ${_n(formattedBalance)} ${chat.info.symbol}
-*Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *Address:* ${shortenAddress(actualBuyer, true)}
+*Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *MarketCap:* $${_n(
-      Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice,
-      0
+      Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
     )}
-*Holders:* ${holdersCounts[chat.info.id]}
+*Holders:* ${_n(holdersCounts[chat.info.id])}
 
 [TX](${`https://basescan.org/tx/${log.transactionHash}`}) | [DEX](${`https://dexscreener.com/base/${chat.info.id}`}) | [BUY](${`https://app.uniswap.org/explore/tokens/base/${chat.info.id}`})
-    `
+      `
   );
 }
 
-async function getSvg(inscription: any, contract: string, symbol: string) {
-  return client.readContract({
-    address: contract as `0x${string}`,
-    abi: [parseAbiItem(getSvgABI(symbol))],
-    functionName: "getSvg",
-    args: [inscription],
-  });
-}
-
-async function getDynamicInscription(
-  contract: string,
-  address: `0x${string}`,
-  symbol: string
-) {
-  const inscriptionABI = getInscriptionABI(symbol);
-
-  const inscription = (await client.readContract({
-    address: contract as `0x${string}`,
-    abi: [parseAbiItem(inscriptionABI.abi)],
-    functionName: inscriptionABI.name,
-    args: [address],
-  })) as any;
-
-  return inscription;
-}
-
-async function getPng(chat: ChatEntry, actualBuyer: `0x${string}`) {
-  const inscription = await getDynamicInscription(
-    chat.info.id,
-    actualBuyer,
-    chat.info.symbol
-  );
-  if (!inscription) return;
-  if (inscription.seed === 0n) return;
-  // console.log("No inscription found for:", address);
-
-  let png: Buffer | undefined;
-
-  if (chat.settings?.imageUrl) {
-    const normalizedInscription = {
-      seed: Number(inscription.seed),
-      extra: Number(inscription.extra),
-      ...(inscription.creator && { creator: inscription.creator }),
+async function getBuyImage(chat: ChatEntry) {
+  if (chat.settings?.imageWebhookUrl) {
+    const imgBuffer = await fetch(chat.settings.imageWebhookUrl).then((res) =>
+      res.arrayBuffer()
+    );
+    return {
+      fileId: Buffer.from(imgBuffer),
+      type: "photo" as const,
     };
-    const inscriptionDataArray = new URLSearchParams(
-      normalizedInscription
-    ).toString();
-    const imgBuffer = await fetch(
-      `${chat.settings.imageUrl}?${inscriptionDataArray}`
-    ).then((res) => res.arrayBuffer());
-    return Buffer.from(imgBuffer);
   }
 
-  const svg = await getSvg(inscription, chat.info.id, chat.info.symbol);
-  if (!svg) return;
-
-  png = new Resvg(svg, {
-    fitTo: { mode: "width", value: 440 },
-  })
-    .render()
-    .asPng();
-
-  return png;
+  const imageData = chat.settings?.thresholds?.[0];
+  if (imageData) return imageData;
 }

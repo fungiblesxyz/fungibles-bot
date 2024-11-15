@@ -1,5 +1,5 @@
 import { PublicClient, parseAbiItem } from "viem";
-
+import { ChatResponse } from "./types";
 export function shortenAddress(address: string, includeLink = false): string {
   const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;
   return includeLink
@@ -11,19 +11,23 @@ export function convertToPositive(value: bigint): bigint {
   return value < 0n ? -value : value;
 }
 
-export function _n(
-  value: number | string,
-  maxFractions?: number | undefined
-): string {
+export function _n(value: number | string): string {
   const num = Number(value);
   if (num === 0) return "0.00";
 
-  const maximumFractionDigits = maxFractions ?? (num < 1 ? undefined : 2);
-  const minimumFractionDigits = maxFractions ? 2 : 0;
+  if (num < 1) {
+    // Find position of first non-zero digit after decimal
+    const decimalStr = num.toFixed(20);
+    const regex = /\.0*[1-9]/;
+    const match = regex.exec(decimalStr);
+    const firstNonZero = match ? match[0].length - 1 : 0;
+    // Show at least 4 digits after the first non-zero
+    const decimals = Math.min(firstNonZero + 3, 20);
+    return num.toFixed(decimals);
+  }
 
   return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits,
-    maximumFractionDigits,
+    maximumFractionDigits: 2,
   }).format(num);
 }
 
@@ -79,4 +83,10 @@ export async function getTokenHoldersCount(
   );
 
   return mappedHoldersCounts;
+}
+
+export async function fetchChats(): Promise<ChatResponse> {
+  return fetch(process.env.CHATS_API_URL!)
+    .then((res) => res.json())
+    .then((json) => json.data);
 }

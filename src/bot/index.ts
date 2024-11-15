@@ -1,9 +1,15 @@
 import { Bot, InlineKeyboard, type Context, InputFile } from "grammy";
 import { getAddress, isAddress } from "viem";
 import { getPools } from "./pools";
-import { shortenAddress } from "../utils";
 import client from "../client";
-
+import {
+  handleSettingsCallback,
+  handleChatEditCallback,
+  handleChatCallback,
+  handleMediaCallback,
+} from "./callbacks";
+import { PendingAction } from "../types";
+import { fetchChats } from "../utils";
 require("dotenv").config();
 
 // async function test() {
@@ -23,15 +29,6 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
-// Define the action types once
-type ActionType = "token" | "emoji" | "image";
-
-// Replace the simple pending map with a more detailed structure
-interface PendingAction {
-  chatId: string;
-  action: ActionType;
-  promptMessage: string;
-}
 const pendingActions = new Map<number, PendingAction>();
 
 // Add error handling for bot startup
@@ -53,7 +50,8 @@ bot.on("callback_query:data", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
 
   if (callbackData === "settings") {
-    return handleSettingsCallback(ctx);
+    const matchingChats = await getMatchingChats(bot, ctx.from.id);
+    return handleSettingsCallback(ctx, bot, matchingChats);
   }
 
   if (callbackData === "cancel") {
@@ -65,12 +63,17 @@ bot.on("callback_query:data", async (ctx) => {
 
   if (callbackData.startsWith("chat-edit_")) {
     const [chatId] = callbackData.replace("chat-edit_", "").split("_");
-    return handleChatEditCallback(ctx, chatId);
+    return handleChatEditCallback(ctx, chatId, pendingActions);
   }
 
   if (callbackData.startsWith("chat_")) {
     const chatId = callbackData.replace("chat_", "");
-    return handleChatCallback(ctx, chatId);
+    return handleChatCallback(ctx, chatId, fetchChatData, pendingActions);
+  }
+
+  if (callbackData.startsWith("chat-media_")) {
+    const chatId = callbackData.replace("chat-media_", "");
+    return handleMediaCallback(ctx, chatId);
   }
 
   console.log("Unknown button event with payload:", callbackData);
@@ -78,7 +81,7 @@ bot.on("callback_query:data", async (ctx) => {
 });
 
 bot.on("my_chat_member", handleChatMemberUpdate);
-bot.on("message:text", async (ctx) => {
+bot.on("message", async (ctx) => {
   const pendingAction = pendingActions.get(ctx.from.id);
 
   if (pendingAction) {
@@ -87,8 +90,12 @@ bot.on("message:text", async (ctx) => {
         return handleTokenUpdate(ctx, pendingAction.chatId);
       case "emoji":
         return handleEmojiUpdate(ctx, pendingAction.chatId);
-      case "image":
-        return handleImageUpdate(ctx, pendingAction.chatId);
+      case "imageWebhook":
+        return handleImageWebhookUpdate(ctx, pendingAction.chatId);
+      case "minBuy":
+        return handleMinBuyUpdate(ctx, pendingAction.chatId);
+      case "media":
+        return handleMediaMessage(ctx, pendingAction.chatId);
     }
   }
 });
@@ -97,7 +104,7 @@ async function getMatchingChats(bot: Bot, userId: number) {
   const chats = await fetchChats();
   const matchingChats = [];
 
-  for (const chatId of chats) {
+  for (const chatId of Object.keys(chats)) {
     try {
       const member = await bot.api.getChatMember(chatId, userId);
       if (["administrator", "creator"].includes(member.status))
@@ -108,12 +115,6 @@ async function getMatchingChats(bot: Bot, userId: number) {
   }
 
   return matchingChats;
-}
-
-async function fetchChats() {
-  return fetch(process.env.CHATS_API_URL!)
-    .then((res) => res.json())
-    .then((json) => Object.keys(json.data));
 }
 
 async function fetchChatData(chatId: string) {
@@ -197,11 +198,11 @@ async function handleEmojiUpdate(ctx: Context, chatId: string) {
   }
 }
 
-async function handleImageUpdate(ctx: Context, chatId: string) {
-  const imageUrl = ctx.message?.text?.trim() ?? "";
+async function handleImageWebhookUpdate(ctx: Context, chatId: string) {
+  const imageWebhookUrl = ctx.message?.text?.trim() ?? "";
 
   // Basic URL validation
-  if (!imageUrl.match(/^https?:\/\/.+/i)) {
+  if (!/^https?:\/\/.+/i.exec(imageWebhookUrl)) {
     return ctx.reply(
       "❌ Please provide a valid image URL starting with http:// or https://",
       {
@@ -213,7 +214,7 @@ async function handleImageUpdate(ctx: Context, chatId: string) {
   try {
     const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
       method: "PATCH",
-      body: JSON.stringify({ settings: { imageUrl } }),
+      body: JSON.stringify({ settings: { imageWebhookUrl } }),
       headers: {
         "Content-Type": "application/json",
       },
@@ -232,98 +233,37 @@ async function handleImageUpdate(ctx: Context, chatId: string) {
   }
 }
 
-async function handleSettingsCallback(ctx: Context) {
-  if (!ctx.callbackQuery?.from?.id) return;
+async function handleMinBuyUpdate(ctx: Context, chatId: string) {
+  const minBuyAmount = ctx.message?.text?.trim() ?? "";
 
-  const matchingChats = await getMatchingChats(bot, ctx.callbackQuery.from.id);
-  if (!matchingChats.length) {
-    await ctx.answerCallbackQuery({
-      text: "❌ No groups added yet! Please add the bot to your group first",
-      show_alert: true,
+  if (!/^\d+(\.\d+)?$/.exec(minBuyAmount)) {
+    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
+      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
     });
-    return;
   }
 
-  const chatsMenu = new InlineKeyboard();
+  try {
+    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings: { minBuyAmount } }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-  for (const chatId of matchingChats) {
-    try {
-      const chat = await bot.api.getChat(chatId);
-      const chatName = chat.title ?? "Unknown Chat";
-      chatsMenu.text(chatName, `chat_${chatId}`).row();
-    } catch (error) {
-      console.error(`Error fetching chat ${chatId}:`, error);
+    if (!response.ok) {
+      await ctx.reply("❌ Failed to update minimum buy amount");
+      return;
     }
+
+    pendingActions.delete(ctx.from?.id!);
+    await ctx.reply("✅ Minimum buy amount updated successfully!");
+  } catch (error) {
+    console.error("❌ Minimum buy amount update error:", error);
+    await ctx.reply(
+      "❌ Failed to update minimum buy amount. Please try again later."
+    );
   }
-
-  chatsMenu.text("Cancel", "cancel");
-
-  await ctx.editMessageText("Select a group to configure:", {
-    reply_markup: chatsMenu,
-  });
-}
-
-async function handleChatEditCallback(ctx: Context, chatId: string) {
-  if (!ctx.from) return;
-
-  const [, , action] = ctx.callbackQuery?.data?.split("_") ?? [];
-
-  const prompts: Record<ActionType, string> = {
-    token: "➡️ Send your token address",
-    emoji: "➡️ Send your preferred emoji",
-    image: "➡️ Send your image URL (must start with http:// or https://)",
-  };
-
-  pendingActions.set(ctx.from.id, {
-    chatId,
-    action: action as ActionType,
-    promptMessage: prompts[action as ActionType],
-  });
-
-  await ctx.editMessageText(prompts[action as ActionType], {
-    reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-  });
-}
-
-function formatPoolsInfo(pools: Record<string, string>): string {
-  return Object.entries(pools)
-    .map(([pool, value]) => `• ${pool}: ${shortenAddress(value, true)}`)
-    .join("\n");
-}
-
-async function handleChatCallback(ctx: Context, chatId: string) {
-  const chatData = await fetchChatData(chatId);
-  if (!chatData?.info.id) {
-    await handleChatEditCallback(ctx, chatId);
-    return;
-  }
-
-  ctx.editMessageText(
-    `
-💎 Current Token Info:
-• Symbol: ${chatData.info.symbol}
-• Address: ${shortenAddress(chatData.info.id, true)}
-${formatPoolsInfo(chatData.pools)}
-
-Select an action:`,
-    {
-      parse_mode: "Markdown",
-      reply_markup: new InlineKeyboard()
-        .text("✏️ Edit token address", `chat-edit_${chatId}_token`)
-        .row()
-        .text(
-          `Emoji: ${chatData.settings?.emoji ?? "Not set"}`,
-          `chat-edit_${chatId}_emoji`
-        )
-        .row()
-        .text(
-          `🖼 ${chatData.settings?.imageUrl ? "Change" : "Set"} Image URL`,
-          `chat-edit_${chatId}_image`
-        )
-        .row()
-        .text("Cancel", "cancel"),
-    }
-  );
 }
 
 async function handleStartCommand(ctx: Context) {
@@ -348,6 +288,62 @@ async function handleStartCommand(ctx: Context) {
       reply_markup: mainMenu,
     }
   );
+}
+
+async function handleMediaMessage(ctx: Context, chatId: string) {
+  let mediaFileId: string | undefined;
+  let mediaType: "photo" | "video" | "animation" | undefined;
+
+  // Handle forwarded message with media
+  if (ctx.message?.photo) {
+    mediaFileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    mediaType = "photo";
+  } else if (ctx.message?.animation) {
+    mediaFileId = ctx.message.animation.file_id;
+    mediaType = "animation";
+  } else if (ctx.message?.video) {
+    mediaFileId = ctx.message.video.file_id;
+    mediaType = "video";
+  } else if (ctx.message?.text?.startsWith("https://t.me/")) {
+    mediaFileId = ctx.message.text;
+  }
+
+  if (!mediaFileId || !mediaType) {
+    await ctx.reply("❌ Please send a valid image, video, GIF, or t.me link");
+    return;
+  }
+
+  try {
+    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        settings: {
+          thresholds: [
+            {
+              threshold: 0,
+              fileId: mediaFileId,
+              type: mediaType,
+            },
+          ],
+        },
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      await ctx.reply("❌ Failed to save media");
+      return;
+    }
+
+    pendingActions.delete(ctx.from?.id!);
+
+    await ctx.reply(`✅ Media saved successfully!`);
+  } catch (error) {
+    console.error("Error saving media:", error);
+    await ctx.reply("❌ Failed to save media. Please try again.");
+  }
 }
 
 async function handleChatMemberUpdate(ctx: Context) {
@@ -376,13 +372,32 @@ export function sendMessageToChat(chatId: string, message: string) {
   });
 }
 
-export function sendImageToChat(
+export function sendMediaToChat(
   chatId: string,
-  image: Buffer,
+  media: Buffer | string,
+  type: "photo" | "video" | "animation",
   message: string
 ) {
-  return bot.api.sendPhoto(chatId, new InputFile(image), {
-    caption: message,
-    parse_mode: "Markdown",
-  });
+  const mediaSource = typeof media === "string" ? media : new InputFile(media);
+
+  if (type === "photo") {
+    return bot.api.sendPhoto(chatId, mediaSource, {
+      caption: message,
+      parse_mode: "Markdown",
+    });
+  }
+
+  if (type === "video") {
+    return bot.api.sendVideo(chatId, mediaSource, {
+      caption: message,
+      parse_mode: "Markdown",
+    });
+  }
+
+  if (type === "animation") {
+    return bot.api.sendAnimation(chatId, mediaSource, {
+      caption: message,
+      parse_mode: "Markdown",
+    });
+  }
 }
