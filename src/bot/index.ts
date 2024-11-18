@@ -135,7 +135,7 @@ async function handleStartCommand(ctx: Context) {
     .text("⚙️ Settings", "settings");
 
   return ctx.reply(
-    `🚀 Welcome to Fungibles Bot - Your Ultimate ERC20i Token Bot! 🚀
+    `Welcome to Fungibles Bot - Your Ultimate ERC20i Token Bot!
 
 ✨ Unique Features:
 • Specialized tracking for ERC20i tokens
