@@ -5,13 +5,13 @@
   "author": "Sam <samuv.eth@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "npm run bot & npm run server",
-    "dev:test": "npm run bot:test & npm run server:test",
+    "dev": "yarn run bot & yarn run server",
+    "dev:test": "yarn run bot:test & yarn run server:test",
     "bot:test": "dotenv -e .env.test nodemon --exec ts-node src/bot/index.ts",
     "server:test": "dotenv -e .env.test nodemon --exec ts-node src/server/index.ts",
     "bot": "nodemon --exec ts-node src/bot/index.ts",
     "server": "nodemon --exec ts-node src/server/index.ts",
-    "start": "node src/build/bot/index.js & node src/build/server/index.js",
+    "start": "node src/build/bot/index.js & node build/server/index.js",
     "build": "tsc"
   },
   "devDependencies": {
