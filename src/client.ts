@@ -3,7 +3,7 @@ import { base } from "viem/chains";
 
 const client = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http("https://base.llamarpc.com"),
 }) as PublicClient;
 
 export default client;
