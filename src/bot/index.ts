@@ -140,11 +140,10 @@ async function handleStartCommand(ctx: Context) {
 ✨ Unique Features:
 • Specialized tracking for ERC20i tokens
 • Diamond Hands Indicator for smart buys
-• Real-time transaction monitoring
 
 💎 Built by ERC20i bulls, for the community:
 • 100% Ad-free
-• Free forever
+• Free and open-source
 
 🌐 Visit: fungibles.xyz
 💬 Join our community: @fungibles_ERC20i
