@@ -58,12 +58,12 @@ export async function monitorBuys() {
         ).toLowerCase() === WETH_ADDRESS.toLowerCase(),
     }))
   );
+  if (!poolTokens.length) return;
 
   client.watchContractEvent({
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
-    fromBlock: 22551763n,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);
