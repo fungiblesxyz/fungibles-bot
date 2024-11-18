@@ -2,7 +2,6 @@
   "name": "cs-bot",
   "version": "0.0.1",
   "description": "Contract scanner",
-  "main": "build/index.js",
   "author": "Sam <samuv.eth@gmail.com>",
   "license": "MIT",
   "scripts": {
@@ -12,7 +11,7 @@
     "server:test": "dotenv -e .env.test nodemon --exec ts-node src/server/index.ts",
     "bot": "nodemon --exec ts-node src/bot/index.ts",
     "server": "nodemon --exec ts-node src/server/index.ts",
-    "start": "node build/bot/index.js & node build/server/index.js",
+    "start": "node src/build/bot/index.js & node src/build/server/index.js",
     "build": "tsc"
   },
   "devDependencies": {
