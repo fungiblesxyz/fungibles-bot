@@ -135,10 +135,21 @@ async function handleStartCommand(ctx: Context) {
     .text("⚙️ Settings", "settings");
 
   return ctx.reply(
-    "👋 Hey! I'm a token tracking bot that helps you monitor token activities in your groups!\n\n" +
-      "ℹ️ I can track token transactions and provide useful commands\n" +
-      "ℹ️ I'm completely ad-free!\n\n" +
-      "To get started, add me to your group and configure token tracking settings.",
+    `🚀 Welcome to Fungibles Bot - Your Ultimate ERC20i Token Bot! 🚀
+
+✨ Unique Features:
+• Specialized tracking for ERC20i tokens
+• Diamond Hands Indicator for smart buys
+• Real-time transaction monitoring
+
+💎 Built by ERC20i bulls, for the community:
+• 100% Ad-free
+• Free forever
+
+🌐 Visit: fungibles.xyz
+💬 Join our community: @fungibles_ERC20i
+
+To get started, add me to your group and configure token tracking settings!`,
     {
       reply_markup: mainMenu,
     }
