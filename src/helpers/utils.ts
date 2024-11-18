@@ -1,5 +1,5 @@
 import { PublicClient, parseAbiItem } from "viem";
-import { ChatResponse } from "./types";
+import { ChatResponse } from "../types";
 export function shortenAddress(address: string, includeLink = false): string {
   const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;
   return includeLink
@@ -88,5 +88,11 @@ export async function getTokenHoldersCount(
 export async function fetchChats(): Promise<ChatResponse> {
   return fetch(process.env.CHATS_API_URL!)
     .then((res) => res.json())
-    .then((json) => json.data);
+    .then((json) => json.data || {});
+}
+
+export async function fetchChatData(chatId: string) {
+  return fetch(`${process.env.CHATS_API_URL}/${chatId}`)
+    .then((res) => res.json())
+    .then((json) => json.data || {});
 }

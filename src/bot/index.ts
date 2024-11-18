@@ -1,15 +1,20 @@
-import { Bot, InlineKeyboard, type Context, InputFile } from "grammy";
+import { Bot, InlineKeyboard, type Context } from "grammy";
 import { getAddress, isAddress } from "viem";
 import { getPools } from "./pools";
 import client from "../client";
 import {
   handleSettingsCallback,
   handleChatEditCallback,
-  handleChatCallback,
+  handleEditSettingsCallback,
   handleMediaCallback,
+  handleSetupToken,
+  handleRemoveWebhook,
+  handleRemoveMedia,
 } from "./callbacks";
 import { PendingAction } from "../types";
-import { fetchChats } from "../utils";
+import { fetchChatData } from "../helpers/utils";
+import { getMatchingChats, updateChatSettings } from "../helpers/bot";
+
 require("dotenv").config();
 
 // async function test() {
@@ -27,7 +32,7 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   process.exit(1);
 }
 
-const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
+export const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
 const pendingActions = new Map<number, PendingAction>();
 
@@ -50,7 +55,7 @@ bot.on("callback_query:data", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
 
   if (callbackData === "settings") {
-    const matchingChats = await getMatchingChats(bot, ctx.from.id);
+    const matchingChats = await getMatchingChats(ctx.from.id);
     return handleSettingsCallback(ctx, bot, matchingChats);
   }
 
@@ -68,12 +73,28 @@ bot.on("callback_query:data", async (ctx) => {
 
   if (callbackData.startsWith("chat_")) {
     const chatId = callbackData.replace("chat_", "");
-    return handleChatCallback(ctx, chatId, fetchChatData, pendingActions);
+    const chatData = await fetchChatData(chatId);
+    if (!chatData?.info?.id) {
+      await handleSetupToken(ctx, chatId, pendingActions);
+      return;
+    }
+    return handleEditSettingsCallback(ctx, chatData);
   }
 
   if (callbackData.startsWith("chat-media_")) {
     const chatId = callbackData.replace("chat-media_", "");
-    return handleMediaCallback(ctx, chatId);
+    const chatData = await fetchChatData(chatId);
+    return handleMediaCallback(ctx, chatId, chatData);
+  }
+
+  if (callbackData.startsWith("chat-remove_")) {
+    const [chatId, type] = callbackData.replace("chat-remove_", "").split("_");
+
+    if (type === "webhook") {
+      return handleRemoveWebhook(ctx, chatId);
+    } else if (type === "media") {
+      return handleRemoveMedia(ctx, chatId);
+    }
   }
 
   console.log("Unknown button event with payload:", callbackData);
@@ -100,172 +121,6 @@ bot.on("message", async (ctx) => {
   }
 });
 
-async function getMatchingChats(bot: Bot, userId: number) {
-  const chats = await fetchChats();
-  const matchingChats = [];
-
-  for (const chatId of Object.keys(chats)) {
-    try {
-      const member = await bot.api.getChatMember(chatId, userId);
-      if (["administrator", "creator"].includes(member.status))
-        matchingChats.push(chatId);
-    } catch (error) {
-      console.error(`Error checking admin status for chat ${chatId}:`, error);
-    }
-  }
-
-  return matchingChats;
-}
-
-async function fetchChatData(chatId: string) {
-  return fetch(`${process.env.CHATS_API_URL}/${chatId}`)
-    .then((res) => res.json())
-    .then((json) => json.data);
-}
-
-async function handleTokenUpdate(ctx: Context, chatId: string) {
-  const text = ctx.message?.text?.trim().toLowerCase() ?? "";
-
-  if (!isAddress(text)) {
-    return ctx.reply("❌ Invalid token address", {
-      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-    });
-  }
-
-  const address = getAddress(text);
-
-  try {
-    const tokenData = await getPools(address, client);
-
-    if (!tokenData) {
-      return ctx.reply(
-        "❌ No pools found for this token. Please create a Uniswap pool first!",
-        {
-          reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-        }
-      );
-    }
-
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ ...tokenData }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("❌ Token update failed:", data);
-      await ctx.reply(
-        "❌ Failed to save token address: " + (data.message || "Unknown error")
-      );
-      return;
-    }
-
-    pendingActions.delete(ctx.from?.id!);
-    await ctx.reply("✅ Token address saved successfully!");
-  } catch (error) {
-    console.error("❌ Token update error:", error);
-    await ctx.reply("❌ Failed to save token address. Please try again later.");
-    return;
-  }
-}
-
-async function handleEmojiUpdate(ctx: Context, chatId: string) {
-  const emoji = ctx.message?.text?.trim() ?? "";
-
-  try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ settings: { emoji } }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      await ctx.reply("❌ Failed to update emoji");
-      return;
-    }
-
-    pendingActions.delete(ctx.from?.id!);
-    await ctx.reply("✅ Emoji updated successfully!");
-  } catch (error) {
-    console.error("❌ Emoji update error:", error);
-    await ctx.reply("❌ Failed to update emoji. Please try again later.");
-  }
-}
-
-async function handleImageWebhookUpdate(ctx: Context, chatId: string) {
-  const imageWebhookUrl = ctx.message?.text?.trim() ?? "";
-
-  // Basic URL validation
-  if (!/^https?:\/\/.+/i.exec(imageWebhookUrl)) {
-    return ctx.reply(
-      "❌ Please provide a valid image URL starting with http:// or https://",
-      {
-        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-      }
-    );
-  }
-
-  try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ settings: { imageWebhookUrl } }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      await ctx.reply("❌ Failed to update image URL");
-      return;
-    }
-
-    pendingActions.delete(ctx.from?.id!);
-    await ctx.reply("✅ Image URL updated successfully!");
-  } catch (error) {
-    console.error("❌ Image URL update error:", error);
-    await ctx.reply("❌ Failed to update image URL. Please try again later.");
-  }
-}
-
-async function handleMinBuyUpdate(ctx: Context, chatId: string) {
-  const minBuyAmount = ctx.message?.text?.trim() ?? "";
-
-  if (!/^\d+(\.\d+)?$/.exec(minBuyAmount)) {
-    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
-      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-    });
-  }
-
-  try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ settings: { minBuyAmount } }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      await ctx.reply("❌ Failed to update minimum buy amount");
-      return;
-    }
-
-    pendingActions.delete(ctx.from?.id!);
-    await ctx.reply("✅ Minimum buy amount updated successfully!");
-  } catch (error) {
-    console.error("❌ Minimum buy amount update error:", error);
-    await ctx.reply(
-      "❌ Failed to update minimum buy amount. Please try again later."
-    );
-  }
-}
-
 async function handleStartCommand(ctx: Context) {
   if (ctx.chat?.type !== "private") {
     return ctx.reply("This command can only be used in group private chats.");
@@ -287,6 +142,90 @@ async function handleStartCommand(ctx: Context) {
     {
       reply_markup: mainMenu,
     }
+  );
+}
+
+async function handleTokenUpdate(ctx: Context, chatId: string) {
+  const text = ctx.message?.text?.trim().toLowerCase() ?? "";
+
+  if (!isAddress(text)) {
+    return ctx.reply("❌ Invalid token address", {
+      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+    });
+  }
+
+  const address = getAddress(text);
+  const tokenData = await getPools(address, client);
+
+  if (!tokenData) {
+    return ctx.reply(
+      "❌ No pools found for this token. Please create a Uniswap pool first!",
+      {
+        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+      }
+    );
+  }
+
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    tokenData,
+    "✅ Token address saved successfully!",
+    "❌ Failed to save token address"
+  );
+}
+
+async function handleEmojiUpdate(ctx: Context, chatId: string) {
+  const emoji = ctx.message?.text?.trim() ?? "";
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    { settings: { emoji } },
+    "✅ Emoji updated successfully!",
+    "❌ Failed to update emoji"
+  );
+}
+
+async function handleImageWebhookUpdate(ctx: Context, chatId: string) {
+  const imageWebhookUrl = ctx.message?.text?.trim() ?? "";
+
+  if (!/^https?:\/\/.+/i.exec(imageWebhookUrl)) {
+    return ctx.reply(
+      "❌ Please provide a valid image URL starting with http:// or https://",
+      {
+        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+      }
+    );
+  }
+
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    { settings: { imageWebhookUrl } },
+    "✅ Image URL updated successfully!",
+    "❌ Failed to update image URL"
+  );
+}
+
+async function handleMinBuyUpdate(ctx: Context, chatId: string) {
+  const minBuyAmount = ctx.message?.text?.trim() ?? "";
+
+  if (!/^\d+(\.\d+)?$/.exec(minBuyAmount)) {
+    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
+      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+    });
+  }
+
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    { settings: { minBuyAmount } },
+    "✅ Minimum buy amount updated successfully!",
+    "❌ Failed to update minimum buy amount"
   );
 }
 
@@ -313,37 +252,24 @@ async function handleMediaMessage(ctx: Context, chatId: string) {
     return;
   }
 
-  try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        settings: {
-          thresholds: [
-            {
-              threshold: 0,
-              fileId: mediaFileId,
-              type: mediaType,
-            },
-          ],
-        },
-      }),
-      headers: {
-        "Content-Type": "application/json",
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    {
+      settings: {
+        thresholds: [
+          {
+            threshold: 0,
+            fileId: mediaFileId,
+            type: mediaType,
+          },
+        ],
       },
-    });
-
-    if (!response.ok) {
-      await ctx.reply("❌ Failed to save media");
-      return;
-    }
-
-    pendingActions.delete(ctx.from?.id!);
-
-    await ctx.reply(`✅ Media saved successfully!`);
-  } catch (error) {
-    console.error("Error saving media:", error);
-    await ctx.reply("❌ Failed to save media. Please try again.");
-  }
+    },
+    "✅ Media saved successfully!",
+    "❌ Failed to save media"
+  );
 }
 
 async function handleChatMemberUpdate(ctx: Context) {
@@ -353,51 +279,39 @@ async function handleChatMemberUpdate(ctx: Context) {
   switch (update.new_chat_member.status) {
     case "member":
     case "administrator":
-      await fetch(process.env.CHATS_API_URL!, {
-        method: "POST",
-        body: JSON.stringify({ id: update.chat.id }),
-      });
-      return console.log("Bot was added to group");
+      try {
+        const response = await fetch(process.env.CHATS_API_URL!, {
+          method: "POST",
+          body: JSON.stringify({ id: update.chat.id.toString() }),
+        });
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(
+            `HTTP error! status: ${response.status}, message: ${errorMessage}`
+          );
+        }
+      } catch (error) {
+        console.error("Failed to register chat:", error);
+      }
+      break;
     case "left":
-      await fetch(`${process.env.CHATS_API_URL}/${update.chat.id}`, {
-        method: "DELETE",
-      });
-      return console.log("Removed from group");
-  }
-}
-
-export function sendMessageToChat(chatId: string, message: string) {
-  return bot.api.sendMessage(chatId, message, {
-    parse_mode: "Markdown",
-  });
-}
-
-export function sendMediaToChat(
-  chatId: string,
-  media: Buffer | string,
-  type: "photo" | "video" | "animation",
-  message: string
-) {
-  const mediaSource = typeof media === "string" ? media : new InputFile(media);
-
-  if (type === "photo") {
-    return bot.api.sendPhoto(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
-  }
-
-  if (type === "video") {
-    return bot.api.sendVideo(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
-  }
-
-  if (type === "animation") {
-    return bot.api.sendAnimation(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
+      try {
+        const response = await fetch(
+          `${process.env.CHATS_API_URL}/${update.chat.id}`,
+          {
+            method: "DELETE",
+          }
+        );
+        console.log("🚀 ~ handleChatMemberUpdate ~ response:", response);
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(
+            `HTTP error! status: ${response.status}, message: ${errorMessage}`
+          );
+        }
+      } catch (error) {
+        console.error("Failed to delete chat:", error);
+      }
+      break;
   }
 }

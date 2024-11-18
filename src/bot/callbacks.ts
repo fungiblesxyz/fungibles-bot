@@ -1,8 +1,9 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { shortenAddress } from "../utils";
-import { PendingAction, ActionType } from "../types";
+import { shortenAddress } from "../helpers/utils";
+import { PendingAction, ActionType, ChatEntry, Pools } from "../types";
+import { updateChatSettings } from "../helpers/bot";
 
-function formatPoolsInfo(pools: Record<string, string>): string {
+function formatPoolsInfo(pools: Pools): string {
   return Object.entries(pools)
     .map(([pool, value]) => `• ${pool}: ${shortenAddress(value, true)}`)
     .join("\n");
@@ -70,41 +71,31 @@ export async function handleChatEditCallback(
   });
 }
 
-export async function handleChatCallback(
+export async function handleEditSettingsCallback(
   ctx: Context,
-  chatId: string,
-  fetchChatData: (chatId: string) => Promise<any>,
-  pendingActions: Map<number, PendingAction>
+  chatData: ChatEntry
 ) {
-  const chatData = await fetchChatData(chatId);
-  if (!chatData?.info.id) {
-    await handleChatEditCallback(ctx, chatId, pendingActions);
-    return;
-  }
-
   ctx.editMessageText(
     `
-💎 Current Token Info:
-• Symbol: ${chatData.info.symbol}
-• Address: ${shortenAddress(chatData.info.id, true)}
-${formatPoolsInfo(chatData.pools)}
-
 Select an action:`,
     {
       parse_mode: "Markdown",
       reply_markup: new InlineKeyboard()
-        .text("✏️ Edit token address", `chat-edit_${chatId}_token`)
+        .text(
+          `✏️ Edit token address (${chatData.info.symbol})`,
+          `chat-edit_${chatData.id}_token`
+        )
         .row()
         .text(
           `Emoji: ${chatData.settings?.emoji ?? "Not set"}`,
-          `chat-edit_${chatId}_emoji`
+          `chat-edit_${chatData.id}_emoji`
         )
         .row()
-        .text(`🖼 Manage Buy Media`, `chat-media_${chatId}`)
+        .text(`🖼 Manage Buy Media`, `chat-media_${chatData.id}`)
         .row()
         .text(
           `💵 Min Buy Alert: $${chatData.settings?.minBuyAmount ?? "0"}`,
-          `chat-edit_${chatId}_minBuy`
+          `chat-edit_${chatData.id}_minBuy`
         )
         .row()
         .text("Cancel", "cancel"),
@@ -112,13 +103,110 @@ Select an action:`,
   );
 }
 
-export async function handleMediaCallback(ctx: Context, chatId: string) {
-  await ctx.editMessageText("🖼 Media Management\n\nChoose an option:", {
-    reply_markup: new InlineKeyboard()
+export async function handleMediaCallback(
+  ctx: Context,
+  chatId: string,
+  chatData: ChatEntry
+) {
+  const webhookUrl = chatData.settings?.imageWebhookUrl;
+  const hasMedia = chatData.settings?.thresholds?.[0];
+
+  let messageText = " ";
+
+  if (webhookUrl) {
+    messageText += `Current URL: ${webhookUrl}\n`;
+  }
+  if (!hasMedia && !webhookUrl) {
+    messageText += "Choose an option:";
+  }
+
+  const keyboard = new InlineKeyboard();
+
+  if (!webhookUrl && !hasMedia) {
+    keyboard
       .text("➕ Add Media (Image/Video)", `chat-edit_${chatId}_media`)
       .row()
       .text("🔗 Set Webhook URL", `chat-edit_${chatId}_imageWebhook`)
-      .row()
-      .text("Cancel", "cancel"),
-  });
+      .row();
+  } else if (webhookUrl) {
+    keyboard.text("❌ Remove URL", `chat-remove_${chatId}_webhook`);
+  } else if (hasMedia) {
+    keyboard.text("❌ Remove Media", `chat-remove_${chatId}_media`);
+  }
+
+  keyboard.text("Cancel", "cancel");
+
+  if (hasMedia) {
+    if (hasMedia.type === "photo") {
+      await ctx.replyWithPhoto(hasMedia.fileId, {
+        caption: messageText,
+        reply_markup: keyboard,
+      });
+    } else if (hasMedia.type === "video") {
+      await ctx.replyWithVideo(hasMedia.fileId, {
+        caption: messageText,
+        reply_markup: keyboard,
+      });
+    } else if (hasMedia.type === "animation") {
+      await ctx.replyWithAnimation(hasMedia.fileId, {
+        caption: messageText,
+        reply_markup: keyboard,
+      });
+    }
+    await ctx.deleteMessage();
+  } else {
+    await ctx.editMessageText(messageText, {
+      link_preview_options: {
+        is_disabled: true,
+      },
+      reply_markup: keyboard,
+    });
+  }
+}
+
+export async function handleSetupToken(
+  ctx: Context,
+  chatId: string,
+  pendingActions: Map<number, PendingAction>
+) {
+  if (!ctx.callbackQuery) return;
+
+  const withModifiedCallback = `${ctx.callbackQuery.data}_token`;
+  ctx.callbackQuery.data = withModifiedCallback;
+
+  return handleChatEditCallback(ctx, chatId, pendingActions);
+}
+
+export async function handleRemoveWebhook(ctx: Context, chatId: string) {
+  const result = await updateChatSettings(
+    ctx,
+    new Map(),
+    chatId,
+    {
+      settings: {
+        imageWebhookUrl: null,
+      },
+    },
+    "✅ Webhook URL removed successfully!",
+    "❌ Failed to remove webhook URL"
+  );
+  await ctx.deleteMessage();
+  return result;
+}
+
+export async function handleRemoveMedia(ctx: Context, chatId: string) {
+  const result = await updateChatSettings(
+    ctx,
+    new Map(),
+    chatId,
+    {
+      settings: {
+        thresholds: null,
+      },
+    },
+    "✅ Media removed successfully!",
+    "❌ Failed to remove media"
+  );
+  await ctx.deleteMessage();
+  return result;
 }

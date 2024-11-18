@@ -1,5 +1,5 @@
 import { parseAbiItem, formatUnits } from "viem";
-import { sendMediaToChat } from "../bot";
+import { sendMediaToChat, sendMessageToChat } from "../helpers/bot";
 import {
   shortenAddress,
   convertToPositive,
@@ -7,7 +7,7 @@ import {
   getEthUsdPrice,
   getTokenHoldersCount,
   fetchChats,
-} from "../utils";
+} from "../helpers/utils";
 import client from "../client";
 import { ChatResponse, ChatEntry } from "../types";
 
@@ -19,8 +19,24 @@ const ERC20_BALANCE_ABI = parseAbiItem(
   "function balanceOf(address) view returns (uint256)"
 );
 
+let chats: ChatResponse;
+
+export async function updateChats() {
+  chats = await fetchChats();
+}
+
 export async function monitorBuys() {
-  const chats = await fetchChats();
+  await updateChats();
+  chats = Object.entries(chats)
+    .filter(([_, chat]) => chat?.info?.id)
+    .reduce(
+      (acc, [key, chat]) => ({
+        ...acc,
+        [key]: chat,
+      }),
+      {}
+    ) as ChatResponse;
+
   const ethUsdPrice = await getEthUsdPrice(client);
   const holdersCounts = await getTokenHoldersCount(chats, client);
 
@@ -47,7 +63,7 @@ export async function monitorBuys() {
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
-    fromBlock: 22423693n,
+    fromBlock: 22551763n,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);
@@ -117,10 +133,6 @@ async function handleBuyEvent(
   });
   if (!balance) return;
 
-  const image = await getBuyImage(chat);
-  console.log("🚀 ~ image:", image);
-  if (!image?.fileId || !image.type) return;
-
   const formattedBalance = formatUnits(balance, Number(chat.info.decimals));
 
   const amountIn = formatUnits(ethAmount, 18);
@@ -128,44 +140,97 @@ async function handleBuyEvent(
 
   const ethPricePerToken = Number(amountIn) / Number(amountOut);
   const spentAmountUsd = Number(amountIn) * ethUsdPrice;
+  const balanceAmountUsd =
+    Number(formattedBalance) * ethPricePerToken * ethUsdPrice;
 
   const emojiCount = Math.max(1, Math.floor(spentAmountUsd / 10));
   const baseEmoji = chat.settings?.emoji || "🟢";
   const emojiString = baseEmoji.repeat(emojiCount);
+  const buyerPosition =
+    balance - BigInt(tokenAmount) > 0n
+      ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(balanceAmountUsd)})`
+      : "🌟 New!";
 
-  sendMediaToChat(
-    chat.id,
-    image.fileId,
-    image.type,
-    `
+  const queryParams = {};
+  const media = await getBuyMedia(chat, log.transactionHash, queryParams);
+  const message = `
 *${chat.info.symbol} Buy!*
 ${emojiString}
 *Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
 *Received:* ${_n(amountOut)} ${chat.info.symbol}
-*New Balance:* ${_n(formattedBalance)} ${chat.info.symbol}
+*Buyer Position:* ${buyerPosition}
 *Address:* ${shortenAddress(actualBuyer, true)}
 *Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *MarketCap:* $${_n(
-      Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
-    )}
+    Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
+  )}
 *Holders:* ${_n(holdersCounts[chat.info.id])}
 
 [TX](${`https://basescan.org/tx/${log.transactionHash}`}) | [DEX](${`https://dexscreener.com/base/${chat.info.id}`}) | [BUY](${`https://app.uniswap.org/explore/tokens/base/${chat.info.id}`})
-      `
-  );
+  `;
+
+  if (media?.data && media.type) {
+    sendMediaToChat(chat.id, media.data, media.type, message);
+  } else {
+    sendMessageToChat(chat.id, message);
+  }
 }
 
-async function getBuyImage(chat: ChatEntry) {
-  if (chat.settings?.imageWebhookUrl) {
-    const imgBuffer = await fetch(chat.settings.imageWebhookUrl).then((res) =>
-      res.arrayBuffer()
-    );
-    return {
-      fileId: Buffer.from(imgBuffer),
-      type: "photo" as const,
-    };
+async function getBuyMedia(
+  chat: ChatEntry,
+  transactionHash: string,
+  queryParams: Record<string, string>
+) {
+  if (chat.settings?.imageWebhookUrl && transactionHash) {
+    const queryString = new URLSearchParams(queryParams);
+    const webhookUrl = `${chat.settings.imageWebhookUrl}/${transactionHash}?${queryString}`;
+
+    try {
+      const response = await fetch(webhookUrl);
+
+      if (!response.ok) {
+        console.error(
+          `Failed to fetch media: ${response.status} ${response.statusText}`
+        );
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get("content-type")?.toLowerCase();
+      if (!contentType) {
+        console.error("No content-type header received from media webhook");
+        throw new Error("Missing content-type header");
+      }
+
+      let mediaType: "video" | "photo" | "animation" = "photo";
+
+      if (contentType.includes("video")) {
+        mediaType = "video";
+      } else if (contentType.includes("gif")) {
+        mediaType = "animation";
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        console.error("Received empty media response");
+        throw new Error("Empty media response");
+      }
+
+      return {
+        data: Buffer.from(arrayBuffer),
+        type: mediaType,
+      };
+    } catch (error) {
+      console.error("Error fetching media from webhook:", error);
+    }
   }
 
   const imageData = chat.settings?.thresholds?.[0];
-  if (imageData) return imageData;
+  if (imageData) {
+    return {
+      data: imageData.fileId,
+      type: imageData.type,
+    };
+  }
+
+  return null;
 }
