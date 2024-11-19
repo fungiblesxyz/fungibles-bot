@@ -64,6 +64,8 @@ export async function updateChatSettings(
   successMessage: string = "✅ Update successful!",
   errorMessage: string = "❌ Update failed. Please try again later."
 ) {
+  const messageRestart = "Do /start if you want to do something else.";
+
   try {
     const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
       method: "PATCH",
@@ -81,11 +83,11 @@ export async function updateChatSettings(
     }
 
     pendingActions.delete(ctx.from?.id!);
-    await ctx.reply(successMessage);
+    await ctx.reply(`${successMessage}\n\n${messageRestart}`);
     return true;
   } catch (error) {
     console.error("Update error:", error);
-    await ctx.reply(errorMessage);
+    await ctx.reply(`${errorMessage}\n\n${messageRestart}`);
     return false;
   }
 }

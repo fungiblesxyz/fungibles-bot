@@ -61,6 +61,12 @@ bot.on("callback_query:data", async (ctx) => {
 
   if (callbackData === "cancel") {
     pendingActions.delete(ctx.from.id);
+    if (!ctx.message) {
+      await ctx.deleteMessage();
+      return ctx.reply(
+        "✔️ Operation cancelled!\n\nDo /start if you want to do something else."
+      );
+    }
     return ctx.editMessageText(
       "✔️ Operation cancelled!\n\nDo /start if you want to do something else."
     );

@@ -131,7 +131,6 @@ async function handleBuyEvent(
     functionName: "balanceOf",
     args: [actualBuyer],
   });
-  if (!balance) return;
 
   const formattedBalance = formatUnits(balance, Number(chat.info.decimals));
 
@@ -143,13 +142,16 @@ async function handleBuyEvent(
   const balanceAmountUsd =
     Number(formattedBalance) * ethPricePerToken * ethUsdPrice;
 
-  const emojiCount = Math.max(1, Math.floor(spentAmountUsd / 10));
-  const baseEmoji = chat.settings?.emoji || "🟢";
+  const emojiCount = Math.max(
+    1,
+    Math.floor(spentAmountUsd / (chat.settings?.minBuyAmount ?? 10))
+  );
+  const baseEmoji = chat.settings?.emoji ?? "🟢";
   const emojiString = baseEmoji.repeat(emojiCount);
   const buyerPosition =
     balance - BigInt(tokenAmount) > 0n
       ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(balanceAmountUsd)})`
-      : "🌟 New!";
+      : "🌟 New Buyer!";
 
   const queryParams = {};
   const media = await getBuyMedia(chat, log.transactionHash, queryParams);
@@ -158,13 +160,12 @@ async function handleBuyEvent(
 ${emojiString}
 *Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
 *Received:* ${_n(amountOut)} ${chat.info.symbol}
+*Buyer:* ${shortenAddress(actualBuyer, true)}
 *Buyer Position:* ${buyerPosition}
-*Address:* ${shortenAddress(actualBuyer, true)}
 *Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *MarketCap:* $${_n(
     Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
   )}
-*Holders:* ${_n(holdersCounts[chat.info.id])}
 
 [TX](${`https://basescan.org/tx/${log.transactionHash}`}) | [DEX](${`https://dexscreener.com/base/${chat.info.id}`}) | [BUY](${`https://app.uniswap.org/explore/tokens/base/${chat.info.id}`})
   `;
