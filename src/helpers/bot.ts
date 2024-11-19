@@ -3,39 +3,61 @@ import { bot } from "../bot";
 import { fetchChats } from "./utils";
 import { PendingAction } from "../types";
 
-export function sendMessageToChat(chatId: string, message: string) {
-  return bot.api.sendMessage(chatId, message, {
-    parse_mode: "Markdown",
-  });
+export async function sendMessageToChat(
+  chatId: string,
+  message: string,
+  threadId?: number
+) {
+  try {
+    return await bot.api.sendMessage(chatId, message, {
+      parse_mode: "Markdown",
+      link_preview_options: {
+        is_disabled: true,
+      },
+      message_thread_id: threadId,
+    });
+  } catch (error) {
+    console.error(`Failed to send message to chat ${chatId}:`, error);
+    sendLogToChannel(`Failed to send message: ${error}`, chatId);
+  }
 }
 
-export function sendMediaToChat(
+export async function sendMediaToChat(
   chatId: string,
   media: Buffer | string,
   type: "photo" | "video" | "animation",
-  message: string
+  message: string,
+  threadId?: number
 ) {
-  const mediaSource = typeof media === "string" ? media : new InputFile(media);
+  try {
+    const mediaSource =
+      typeof media === "string" ? media : new InputFile(media);
 
-  if (type === "photo") {
-    return bot.api.sendPhoto(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
-  }
-
-  if (type === "video") {
-    return bot.api.sendVideo(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
-  }
-
-  if (type === "animation") {
-    return bot.api.sendAnimation(chatId, mediaSource, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
+    switch (type) {
+      case "photo":
+        return await bot.api.sendPhoto(chatId, mediaSource, {
+          caption: message,
+          parse_mode: "Markdown",
+          message_thread_id: threadId,
+        });
+      case "video":
+        return await bot.api.sendVideo(chatId, mediaSource, {
+          caption: message,
+          parse_mode: "Markdown",
+          message_thread_id: threadId,
+        });
+      case "animation":
+        return await bot.api.sendAnimation(chatId, mediaSource, {
+          caption: message,
+          parse_mode: "Markdown",
+          message_thread_id: threadId,
+        });
+    }
+  } catch (error) {
+    console.error(`Failed to send media to chat ${chatId}:`, error);
+    sendLogToChannel(`Failed to send media: ${error}`, chatId);
+    // Fallback to text-only message
+    return sendMessageToChat(chatId, message);
   }
 }
 
@@ -50,6 +72,7 @@ export async function getMatchingChats(userId: number) {
         matchingChats.push(chatId);
     } catch (error) {
       console.error(`Error checking admin status for chat ${chatId}:`, error);
+      sendLogToChannel(`Error checking admin status: ${error}`, chatId);
     }
   }
 
@@ -88,6 +111,27 @@ export async function updateChatSettings(
   } catch (error) {
     console.error("Update error:", error);
     await ctx.reply(`${errorMessage}\n\n${messageRestart}`);
+    sendLogToChannel(`Update error: ${error} Message: ${errorMessage}`, chatId);
     return false;
+  }
+}
+
+export async function sendLogToChannel(
+  message: string,
+  chatId?: string | number
+) {
+  try {
+    const prefix = process.env.NODE_ENV === "test" ? "[TEST] " : "";
+    const chatInfo = chatId ? `[Chat: ${chatId}] ` : "";
+    await bot.api.sendMessage(
+      "-1002420548293",
+      `🔴 ${prefix}${chatInfo}Error Log:\n${message}`,
+      {
+        parse_mode: "Markdown",
+        message_thread_id: 2,
+      }
+    );
+  } catch (error) {
+    console.error("Failed to send log to channel:", error);
   }
 }

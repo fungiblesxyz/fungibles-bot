@@ -1,7 +1,7 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
 import { shortenAddress } from "../helpers/utils";
 import { PendingAction, ActionType, ChatEntry, Pools } from "../types";
-import { updateChatSettings } from "../helpers/bot";
+import { updateChatSettings, sendLogToChannel } from "../helpers/bot";
 
 function formatPoolsInfo(pools: Pools): string {
   return Object.entries(pools)
@@ -31,6 +31,7 @@ export async function handleSettingsCallback(
       chatsMenu.text(chatName, `chat_${chatId}`).row();
     } catch (error) {
       console.error(`Error fetching chat ${chatId}:`, error);
+      sendLogToChannel(`Error fetching chat: ${error}`, chatId);
     }
   }
 

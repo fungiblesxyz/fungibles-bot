@@ -26,8 +26,9 @@ export interface Pools {
 
 export interface ChatEntry {
   id: string;
+  threadId?: number;
   info: TokenInfo;
-  pools: Pools;
+  pools?: Pools;
   settings?: {
     emoji?: string;
     imageUrl?: string;

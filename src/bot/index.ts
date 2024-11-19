@@ -13,7 +13,11 @@ import {
 } from "./callbacks";
 import { PendingAction } from "../types";
 import { fetchChatData } from "../helpers/utils";
-import { getMatchingChats, updateChatSettings } from "../helpers/bot";
+import {
+  getMatchingChats,
+  updateChatSettings,
+  sendLogToChannel,
+} from "../helpers/bot";
 
 require("dotenv").config();
 
@@ -308,6 +312,7 @@ async function handleChatMemberUpdate(ctx: Context) {
         }
       } catch (error) {
         console.error("Failed to register chat:", error);
+        sendLogToChannel(`Failed to register chat: ${error}`, update.chat.id);
       }
       break;
     case "left":
@@ -327,6 +332,7 @@ async function handleChatMemberUpdate(ctx: Context) {
         }
       } catch (error) {
         console.error("Failed to delete chat:", error);
+        sendLogToChannel(`Failed to delete chat: ${error}`, update.chat.id);
       }
       break;
   }

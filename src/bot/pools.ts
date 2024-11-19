@@ -1,4 +1,5 @@
 import { Address, PublicClient, formatUnits } from "viem";
+import { sendLogToChannel } from "../helpers/bot";
 
 // Constants
 const UNISWAP_V3_FACTORY = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
@@ -24,49 +25,57 @@ export async function getPools(
   tokenAddress: Address,
   publicClient: PublicClient
 ): Promise<PoolsResponse | null> {
-  // Get V3 pools for all fee tiers
-  const v3PoolPromises = FEE_TIERS.map((fee) =>
-    publicClient.readContract({
-      address: UNISWAP_V3_FACTORY,
-      abi: [
-        {
-          inputs: [
-            { type: "address" },
-            { type: "address" },
-            { type: "uint24" },
+  try {
+    const v3PoolPromises = FEE_TIERS.map(async (fee) => {
+      try {
+        return await publicClient.readContract({
+          address: UNISWAP_V3_FACTORY,
+          abi: [
+            {
+              inputs: [
+                { type: "address" },
+                { type: "address" },
+                { type: "uint24" },
+              ],
+              name: "getPool",
+              outputs: [{ type: "address" }],
+              stateMutability: "view",
+              type: "function",
+            },
           ],
-          name: "getPool",
-          outputs: [{ type: "address" }],
-          stateMutability: "view",
-          type: "function",
-        },
-      ],
-      functionName: "getPool",
-      args: [tokenAddress, WETH, fee],
-    })
-  );
+          functionName: "getPool",
+          args: [tokenAddress, WETH, fee],
+        });
+      } catch (error) {
+        console.error(`Failed to fetch pool for fee tier ${fee}:`, error);
+        return "0x0000000000000000000000000000000000000000";
+      }
+    });
 
-  const [tokenInfo, ...v3Pools] = await Promise.all([
-    getTokenInfo(tokenAddress, publicClient),
-    ...v3PoolPromises,
-  ]);
+    const [tokenInfo, ...v3Pools] = await Promise.all([
+      getTokenInfo(tokenAddress, publicClient),
+      ...v3PoolPromises,
+    ]);
 
-  // Find first non-zero V3 pool
-  const v3Pool = v3Pools.find(
-    (pool) => pool !== "0x0000000000000000000000000000000000000000"
-  );
+    const v3Pool = v3Pools.find(
+      (pool) => pool !== "0x0000000000000000000000000000000000000000"
+    );
 
-  // If no pools exist, return null
-  if (!v3Pool) {
+    if (!v3Pool) {
+      return null;
+    }
+
+    return {
+      info: tokenInfo,
+      pools: {
+        UniswapV3: v3Pool,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get pools:", error);
+    sendLogToChannel(`Failed to get pools: ${error}`);
     return null;
   }
-
-  return {
-    info: tokenInfo,
-    pools: {
-      UniswapV3: v3Pool,
-    },
-  };
 }
 
 async function getTokenInfo(

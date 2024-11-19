@@ -1,5 +1,9 @@
 import { parseAbiItem, formatUnits } from "viem";
-import { sendMediaToChat, sendMessageToChat } from "../helpers/bot";
+import {
+  sendMediaToChat,
+  sendMessageToChat,
+  sendLogToChannel,
+} from "../helpers/bot";
 import {
   shortenAddress,
   convertToPositive,
@@ -22,7 +26,16 @@ const ERC20_BALANCE_ABI = parseAbiItem(
 let chats: ChatResponse;
 
 export async function updateChats() {
-  chats = await fetchChats();
+  try {
+    chats = await fetchChats();
+  } catch (error) {
+    console.error("Failed to update chats:", error);
+    sendLogToChannel(`Failed to update chats: ${error}`);
+    // Use previous chats data if available
+    if (!chats) {
+      chats = {};
+    }
+  }
 }
 
 export async function monitorBuys() {
@@ -37,11 +50,26 @@ export async function monitorBuys() {
       {}
     ) as ChatResponse;
 
-  const ethUsdPrice = await getEthUsdPrice(client);
-  const holdersCounts = await getTokenHoldersCount(chats, client);
+  let ethUsdPrice: number;
+  let holdersCounts: Record<string, number>;
+
+  try {
+    [ethUsdPrice, holdersCounts] = await Promise.all([
+      getEthUsdPrice(client),
+      getTokenHoldersCount(chats, client),
+    ]);
+
+    if (ethUsdPrice === 0) {
+      throw new Error("Failed to fetch ETH price");
+    }
+  } catch (error) {
+    console.error("Failed to fetch critical data:", error);
+    sendLogToChannel(`Failed to fetch critical data: ${error}`);
+    return; // Exit monitoring if we can't get critical data
+  }
 
   const v3Pools = Object.values(chats)
-    .map((chat) => chat.pools.UniswapV3)
+    .map((chat) => chat.pools?.UniswapV3)
     .filter((address): address is string => !!address);
 
   const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
@@ -64,36 +92,45 @@ export async function monitorBuys() {
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
+    fromBlock: process.env.BUYS_FROM_BLOCK_NUMBER
+      ? BigInt(process.env.BUYS_FROM_BLOCK_NUMBER)
+      : undefined,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);
+      sendLogToChannel(`Error watching contract events: ${error}`);
     },
     onLogs: (logs) => {
       for (const log of logs) {
-        const { amount0, amount1 } = log.args;
-        const poolInfo = poolTokens.find(
-          (p) => p.pool.toLowerCase() === log.address.toLowerCase()
-        );
-        if (!poolInfo || amount0 === undefined || amount1 === undefined)
-          continue;
+        try {
+          const { amount0, amount1 } = log.args;
+          const poolInfo = poolTokens.find(
+            (p) => p.pool.toLowerCase() === log.address.toLowerCase()
+          );
+          if (!poolInfo || amount0 === undefined || amount1 === undefined)
+            continue;
 
-        const isBuy = poolInfo.isWethToken0 ? amount1 < 0n : amount0 < 0n;
+          const isBuy = poolInfo.isWethToken0 ? amount1 < 0n : amount0 < 0n;
 
-        if (isBuy) {
-          const ethAmount = convertToPositive(
-            poolInfo.isWethToken0 ? amount0 : amount1
-          );
-          const tokenAmount = convertToPositive(
-            poolInfo.isWethToken0 ? amount1 : amount0
-          );
-          handleBuyEvent(
-            log,
-            chats,
-            ethAmount,
-            tokenAmount,
-            ethUsdPrice,
-            holdersCounts
-          );
+          if (isBuy) {
+            const ethAmount = convertToPositive(
+              poolInfo.isWethToken0 ? amount0 : amount1
+            );
+            const tokenAmount = convertToPositive(
+              poolInfo.isWethToken0 ? amount1 : amount0
+            );
+            handleBuyEvent(
+              log,
+              chats,
+              ethAmount,
+              tokenAmount,
+              ethUsdPrice,
+              holdersCounts
+            );
+          }
+        } catch (error) {
+          console.error(`Error processing log: ${error}`, log);
+          sendLogToChannel(`Error processing buy event: ${error}`);
         }
       }
     },
@@ -108,54 +145,76 @@ async function handleBuyEvent(
   ethUsdPrice: number,
   holdersCounts: Record<string, number>
 ) {
-  const chat = Object.values(chats).find(
-    (chat) => chat.pools.UniswapV3?.toLowerCase() === log.address.toLowerCase()
+  const matchingChats = Object.values(chats).filter(
+    (chat) => chat.pools?.UniswapV3?.toLowerCase() === log.address.toLowerCase()
   );
-  if (!chat) return;
+  if (matchingChats.length === 0) return;
 
-  const amountInEth = Number(formatUnits(ethAmount, 18));
-  const spentAmount = amountInEth * ethUsdPrice;
-  if (chat.settings?.minBuyAmount && spentAmount < chat.settings.minBuyAmount) {
-    return;
-  }
+  try {
+    const amountInEth = Number(formatUnits(ethAmount, 18));
+    const spentAmount = amountInEth * ethUsdPrice;
 
-  const transaction = await client.getTransaction({
-    hash: log.transactionHash,
-  });
+    const transaction = await client
+      .getTransaction({
+        hash: log.transactionHash,
+      })
+      .catch((error) => {
+        throw new Error(`Failed to fetch transaction: ${error}`);
+      });
 
-  const actualBuyer = transaction.from;
+    const actualBuyer = transaction.from;
 
-  const balance = await client.readContract({
-    address: chat.info.id as `0x${string}`,
-    abi: [ERC20_BALANCE_ABI],
-    functionName: "balanceOf",
-    args: [actualBuyer],
-  });
+    const balance = await client
+      .readContract({
+        address: matchingChats[0].info.id as `0x${string}`,
+        abi: [ERC20_BALANCE_ABI],
+        functionName: "balanceOf",
+        args: [actualBuyer],
+      })
+      .catch((error) => {
+        throw new Error(`Failed to read balance: ${error}`);
+      });
 
-  const formattedBalance = formatUnits(balance, Number(chat.info.decimals));
+    const formattedBalance = formatUnits(
+      balance,
+      Number(matchingChats[0].info.decimals)
+    );
 
-  const amountIn = formatUnits(ethAmount, 18);
-  const amountOut = formatUnits(tokenAmount, Number(chat.info.decimals));
+    const amountIn = formatUnits(ethAmount, 18);
+    const amountOut = formatUnits(
+      tokenAmount,
+      Number(matchingChats[0].info.decimals)
+    );
 
-  const ethPricePerToken = Number(amountIn) / Number(amountOut);
-  const spentAmountUsd = Number(amountIn) * ethUsdPrice;
-  const balanceAmountUsd =
-    Number(formattedBalance) * ethPricePerToken * ethUsdPrice;
+    const ethPricePerToken = Number(amountIn) / Number(amountOut);
+    const spentAmountUsd = Number(amountIn) * ethUsdPrice;
+    const balanceAmountUsd =
+      Number(formattedBalance) * ethPricePerToken * ethUsdPrice;
 
-  const emojiCount = Math.max(
-    1,
-    Math.floor(spentAmountUsd / (chat.settings?.minBuyAmount ?? 10))
-  );
-  const baseEmoji = chat.settings?.emoji ?? "🟢";
-  const emojiString = baseEmoji.repeat(emojiCount);
-  const buyerPosition =
-    balance - BigInt(tokenAmount) > 0n
-      ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(balanceAmountUsd)})`
-      : "🌟 New Buyer!";
+    for (const chat of matchingChats) {
+      if (
+        chat.settings?.minBuyAmount &&
+        spentAmount < chat.settings.minBuyAmount
+      ) {
+        continue;
+      }
 
-  const queryParams = {};
-  const media = await getBuyMedia(chat, log.transactionHash, queryParams);
-  const message = `
+      const emojiCount = Math.max(
+        1,
+        Math.floor(spentAmountUsd / (chat.settings?.minBuyAmount ?? 10))
+      );
+      const baseEmoji = chat.settings?.emoji ?? "🟢";
+      const emojiString = baseEmoji.repeat(emojiCount);
+      const buyerPosition =
+        balance - BigInt(tokenAmount) > 0n
+          ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(
+              balanceAmountUsd
+            )})`
+          : "🌟 New Buyer!";
+
+      const queryParams = {};
+      const media = await getBuyMedia(chat, log.transactionHash, queryParams);
+      const message = `
 *${chat.info.symbol} Buy!*
 ${emojiString}
 *Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
@@ -164,16 +223,31 @@ ${emojiString}
 *Buyer Position:* ${buyerPosition}
 *Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *MarketCap:* $${_n(
-    Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
-  )}
+        Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
+      )}
 
 [TX](${`https://basescan.org/tx/${log.transactionHash}`}) | [DEX](${`https://dexscreener.com/base/${chat.info.id}`}) | [BUY](${`https://app.uniswap.org/explore/tokens/base/${chat.info.id}`})
-  `;
+      `;
 
-  if (media?.data && media.type) {
-    sendMediaToChat(chat.id, media.data, media.type, message);
-  } else {
-    sendMessageToChat(chat.id, message);
+      if (media?.data && media.type) {
+        await sendMediaToChat(
+          chat.id,
+          media.data,
+          media.type,
+          message,
+          chat.threadId
+        );
+      } else {
+        await sendMessageToChat(chat.id, message, chat.threadId);
+      }
+    }
+  } catch (error) {
+    console.error(`Error handling buy event: ${error}`, {
+      txHash: log.transactionHash,
+      pool: log.address,
+    });
+
+    sendLogToChannel(`Error handling buy event: ${error}`);
   }
 }
 
