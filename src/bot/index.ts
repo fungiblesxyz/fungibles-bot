@@ -21,16 +21,6 @@ import {
 
 require("dotenv").config();
 
-// async function test() {
-//   const tokenData = await getPools(
-//     "0x7d9CE55D54FF3FEddb611fC63fF63ec01F26D15F",
-//     client
-//   );
-//   console.log("🚀 ~ getAddressConversation ~ tokenData:", tokenData);
-// }
-
-// test();
-
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
   process.exit(1);
@@ -40,18 +30,14 @@ export const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
 const pendingActions = new Map<number, PendingAction>();
 
-// Add error handling for bot startup
-try {
-  bot.start().catch((err) => {
-    if (err.error_code === 409) {
-      console.warn("Warning: Another bot instance may be running");
-    } else {
-      console.error("Bot startup error:", err);
-    }
-  });
-} catch (err) {
-  console.error("Failed to start bot:", err);
-}
+// Bot startup
+bot.start().catch((err) => {
+  if (err.error_code === 409) {
+    console.warn("Warning: Another bot instance may be running");
+  } else {
+    console.error("Bot startup error:", err);
+  }
+});
 
 bot.command("start", handleStartCommand);
 
@@ -253,7 +239,6 @@ async function handleMediaMessage(ctx: Context, chatId: string) {
   let mediaFileId: string | undefined;
   let mediaType: "photo" | "video" | "animation" | undefined;
 
-  // Handle forwarded message with media
   if (ctx.message?.photo) {
     mediaFileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
     mediaType = "photo";
@@ -300,6 +285,7 @@ async function handleChatMemberUpdate(ctx: Context) {
     case "member":
     case "administrator":
       try {
+        sendLogToChannel(`Chat ${update.chat.id} added the bot to their group`);
         const response = await fetch(process.env.CHATS_API_URL!, {
           method: "POST",
           body: JSON.stringify({ id: update.chat.id.toString() }),
@@ -317,6 +303,9 @@ async function handleChatMemberUpdate(ctx: Context) {
       break;
     case "left":
       try {
+        sendLogToChannel(
+          `Chat ${update.chat.id} removed the bot from their group`
+        );
         const response = await fetch(
           `${process.env.CHATS_API_URL}/${update.chat.id}`,
           {

@@ -246,7 +246,6 @@ ${emojiString}
       txHash: log.transactionHash,
       pool: log.address,
     });
-
     sendLogToChannel(`Error handling buy event: ${error}`);
   }
 }
@@ -296,6 +295,7 @@ async function getBuyMedia(
       };
     } catch (error) {
       console.error("Error fetching media from webhook:", error);
+      sendLogToChannel(`Error fetching media from webhook: ${error}`);
     }
   }
 

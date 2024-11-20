@@ -1,13 +1,6 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { shortenAddress } from "../helpers/utils";
-import { PendingAction, ActionType, ChatEntry, Pools } from "../types";
+import { PendingAction, ActionType, ChatEntry } from "../types";
 import { updateChatSettings, sendLogToChannel } from "../helpers/bot";
-
-function formatPoolsInfo(pools: Pools): string {
-  return Object.entries(pools)
-    .map(([pool, value]) => `• ${pool}: ${shortenAddress(value, true)}`)
-    .join("\n");
-}
 
 export async function handleSettingsCallback(
   ctx: Context,
