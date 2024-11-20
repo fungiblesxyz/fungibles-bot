@@ -1,5 +1,7 @@
 import { PublicClient, parseAbiItem } from "viem";
 import { ChatResponse } from "../types";
+import { sendLogToChannel } from "./bot";
+
 export function shortenAddress(address: string, includeLink = false): string {
   const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;
   return includeLink
@@ -86,13 +88,31 @@ export async function getTokenHoldersCount(
 }
 
 export async function fetchChats(): Promise<ChatResponse> {
-  return fetch(process.env.CHATS_API_URL!)
-    .then((res) => res.json())
-    .then((json) => json.data || {});
+  try {
+    const response = await fetch(process.env.CHATS_API_URL!);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const json = await response.json();
+    return json.data || {};
+  } catch (error) {
+    console.error("Failed to fetch chats:", error);
+    sendLogToChannel(`Failed to fetch chats: ${error}`);
+    return {};
+  }
 }
 
 export async function fetchChatData(chatId: string) {
-  return fetch(`${process.env.CHATS_API_URL}/${chatId}`)
-    .then((res) => res.json())
-    .then((json) => json.data || {});
+  try {
+    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const json = await response.json();
+    return json.data || {};
+  } catch (error) {
+    console.error(`Failed to fetch chat data for ${chatId}:`, error);
+    sendLogToChannel(`Failed to fetch chat data: ${error}`, chatId);
+    return {};
+  }
 }
