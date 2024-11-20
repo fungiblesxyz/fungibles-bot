@@ -12,8 +12,8 @@ import {
   getTokenHoldersCount,
   fetchChats,
 } from "../helpers/utils";
-import client from "../client";
-import { ChatResponse, ChatEntry } from "../types";
+import client from "../helpers/client";
+import { ChatResponse, ChatEntry } from "../helpers/types";
 
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"

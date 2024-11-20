@@ -1,7 +1,7 @@
 import { InputFile, Context } from "grammy";
 import { bot } from "../bot";
 import { fetchChats } from "./utils";
-import { PendingAction } from "../types";
+import { PendingAction } from "./types";
 
 export async function sendMessageToChat(
   chatId: string,

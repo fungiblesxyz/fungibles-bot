@@ -1,5 +1,5 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { PendingAction, ActionType, ChatEntry } from "../types";
+import { PendingAction, ActionType, ChatEntry } from "../helpers/types";
 import { updateChatSettings, sendLogToChannel } from "../helpers/bot";
 
 export async function handleSettingsCallback(

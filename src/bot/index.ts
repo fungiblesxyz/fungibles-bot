@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard, type Context } from "grammy";
 import { getAddress, isAddress } from "viem";
 import { getPools } from "./pools";
-import client from "../client";
+import client from "../helpers/client";
 import {
   handleSettingsCallback,
   handleChatEditCallback,
@@ -11,15 +11,13 @@ import {
   handleRemoveWebhook,
   handleRemoveMedia,
 } from "./callbacks";
-import { PendingAction } from "../types";
+import { PendingAction } from "../helpers/types";
 import { fetchChatData } from "../helpers/utils";
 import {
   getMatchingChats,
   updateChatSettings,
   sendLogToChannel,
 } from "../helpers/bot";
-
-require("dotenv").config();
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
@@ -29,15 +27,6 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 export const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
 const pendingActions = new Map<number, PendingAction>();
-
-// Bot startup
-bot.start().catch((err) => {
-  if (err.error_code === 409) {
-    console.warn("Warning: Another bot instance may be running");
-  } else {
-    console.error("Bot startup error:", err);
-  }
-});
 
 bot.command("start", handleStartCommand);
 

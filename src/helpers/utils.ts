@@ -1,5 +1,5 @@
 import { PublicClient, parseAbiItem } from "viem";
-import { ChatResponse } from "../types";
+import { ChatResponse } from "./types";
 import { sendLogToChannel } from "./bot";
 
 export function shortenAddress(address: string, includeLink = false): string {
