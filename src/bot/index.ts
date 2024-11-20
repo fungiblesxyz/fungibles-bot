@@ -18,7 +18,7 @@ import {
   updateChatSettings,
   sendLogToChannel,
 } from "../helpers/bot";
-
+import { addAgentUserReply } from "../agents";
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
   process.exit(1);
@@ -88,6 +88,8 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.on("my_chat_member", handleChatMemberUpdate);
 bot.on("message", async (ctx) => {
+  addAgentUserReply(ctx);
+
   const pendingAction = pendingActions.get(ctx.from.id);
 
   if (pendingAction) {

@@ -1,6 +1,7 @@
+import { CronJob } from "cron";
 import { bot } from "./bot/index";
 import { monitorBuys, updateChats } from "./server/buys";
-import { CronJob } from "cron";
+import { callAgent } from "./agents/index";
 
 require("dotenv").config();
 
@@ -14,10 +15,22 @@ bot.start().catch((err) => {
 });
 
 // Start the server job
-export const job = new CronJob(
+export const updateChatsJob = new CronJob(
   "*/20 * * * * *", // every 20 seconds
   updateChats
 );
 
 monitorBuys();
-job.start();
+updateChatsJob.start();
+
+// Start the agent job
+export const callAgentJob = new CronJob(
+  "0 */15 * * * *", // every 15 minutes
+  callAgent,
+  null,
+  true,
+  undefined,
+  undefined,
+  true
+);
+callAgentJob.start();
