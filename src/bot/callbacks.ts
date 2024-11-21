@@ -24,7 +24,9 @@ export async function handleSettingsCallback(
       chatsMenu.text(chatName, `chat_${chatId}`).row();
     } catch (error) {
       console.error(`Error fetching chat ${chatId}:`, error);
-      sendLogToChannel(`Error fetching chat: ${error}`, chatId);
+      sendLogToChannel(`Error fetching chat: ${error}`, {
+        chatId,
+      });
     }
   }
 

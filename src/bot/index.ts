@@ -273,11 +273,19 @@ async function handleChatMemberUpdate(ctx: Context) {
   const update = ctx.myChatMember;
   if (!update) return;
 
+  sendLogToChannel(`Updated status: ${update.new_chat_member.status}`, {
+    type: "log",
+  });
   switch (update.new_chat_member.status) {
     case "member":
     case "administrator":
       try {
-        sendLogToChannel(`Chat ${update.chat.id} added the bot to their group`);
+        sendLogToChannel(
+          `Chat ${update.chat.id} added the bot to their group`,
+          {
+            type: "log",
+          }
+        );
         const response = await fetch(process.env.CHATS_API_URL!, {
           method: "POST",
           body: JSON.stringify({ id: update.chat.id.toString() }),
@@ -293,13 +301,19 @@ async function handleChatMemberUpdate(ctx: Context) {
         }
       } catch (error) {
         console.error("Failed to register chat:", error);
-        sendLogToChannel(`Failed to register chat: ${error}`, update.chat.id);
+        sendLogToChannel(`Failed to register chat: ${error}`, {
+          chatId: update.chat.id,
+        });
       }
       break;
     case "left":
+    case "kicked":
       try {
         sendLogToChannel(
-          `Chat ${update.chat.id} removed the bot from their group`
+          `Chat ${update.chat.id} removed the bot from their group`,
+          {
+            type: "log",
+          }
         );
         const response = await fetch(
           `${process.env.CHATS_API_URL}/${update.chat.id}`,
@@ -310,7 +324,6 @@ async function handleChatMemberUpdate(ctx: Context) {
             },
           }
         );
-        console.log("🚀 ~ handleChatMemberUpdate ~ response:", response);
         if (!response.ok) {
           const errorMessage = await response.text();
           throw new Error(
@@ -319,7 +332,9 @@ async function handleChatMemberUpdate(ctx: Context) {
         }
       } catch (error) {
         console.error("Failed to delete chat:", error);
-        sendLogToChannel(`Failed to delete chat: ${error}`, update.chat.id);
+        sendLogToChannel(`Failed to delete chat: ${error}`, {
+          chatId: update.chat.id,
+        });
       }
       break;
   }

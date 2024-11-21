@@ -18,7 +18,9 @@ export async function sendMessageToChat(
     });
   } catch (error) {
     console.error(`Failed to send message to chat ${chatId}:`, error);
-    sendLogToChannel(`Failed to send message: ${error}`, chatId);
+    sendLogToChannel(`Failed to send message: ${error}`, {
+      chatId,
+    });
   }
 }
 
@@ -55,7 +57,9 @@ export async function sendMediaToChat(
     }
   } catch (error) {
     console.error(`Failed to send media to chat ${chatId}:`, error);
-    sendLogToChannel(`Failed to send media: ${error}`, chatId);
+    sendLogToChannel(`Failed to send media: ${error}`, {
+      chatId,
+    });
     // Fallback to text-only message
     return sendMessageToChat(chatId, message);
   }
@@ -72,7 +76,9 @@ export async function getMatchingChats(userId: number) {
         matchingChats.push(chatId);
     } catch (error) {
       console.error(`Error checking admin status for chat ${chatId}:`, error);
-      sendLogToChannel(`Error checking admin status: ${error}`, chatId);
+      sendLogToChannel(`Error checking admin status: ${error}`, {
+        chatId,
+      });
     }
   }
 
@@ -112,21 +118,29 @@ export async function updateChatSettings(
   } catch (error) {
     console.error("Update error:", error);
     await ctx.reply(`${errorMessage}\n\n${messageRestart}`);
-    sendLogToChannel(`Update error: ${error} Message: ${errorMessage}`, chatId);
+    sendLogToChannel(`Update error: ${error} Message: ${errorMessage}`, {
+      chatId,
+    });
     return false;
   }
 }
 
 export async function sendLogToChannel(
   message: string,
-  chatId?: string | number
+  options: {
+    chatId?: string | number;
+    type?: "error" | "log";
+  } = {}
 ) {
   try {
     const prefix = process.env.NODE_ENV === "test" ? "[TEST] " : "";
-    const chatInfo = chatId ? `[Chat: ${chatId}] ` : "";
+    const chatInfo = options.chatId ? `[Chat: ${options.chatId}] ` : "";
+    const emoji = !options.type ? "🚨" : "📝";
     await bot.api.sendMessage(
       "-1002420548293",
-      `🔴 ${prefix}${chatInfo}Error Log:\n${message}`,
+      `${prefix}${chatInfo}${emoji} ${
+        !options.type ? "Error Log:" : "Log:"
+      }\n${message}`,
       {
         parse_mode: "Markdown",
         message_thread_id: 2,

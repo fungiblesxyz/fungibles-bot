@@ -112,7 +112,9 @@ export async function fetchChatData(chatId: string) {
     return json.data || {};
   } catch (error) {
     console.error(`Failed to fetch chat data for ${chatId}:`, error);
-    sendLogToChannel(`Failed to fetch chat data: ${error}`, chatId);
+    sendLogToChannel(`Failed to fetch chat data: ${error}`, {
+      chatId,
+    });
     return {};
   }
 }
