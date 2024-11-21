@@ -1,5 +1,5 @@
 import { Address, PublicClient, formatUnits } from "viem";
-import { sendLogToChannel } from "../helpers/bot";
+import { sendLogToChannel } from "../bot";
 
 // Constants
 const UNISWAP_V3_FACTORY = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";

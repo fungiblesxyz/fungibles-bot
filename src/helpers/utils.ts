@@ -118,3 +118,8 @@ export async function fetchChatData(chatId: string) {
     return {};
   }
 }
+
+export function getDaysSince(timestamp: number) {
+  const currentTimestampSeconds = Math.floor(Date.now() / 1000);
+  return Math.floor((currentTimestampSeconds - timestamp) / (60 * 60 * 24));
+}

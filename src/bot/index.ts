@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard, type Context } from "grammy";
 import { getAddress, isAddress } from "viem";
-import { getPools } from "./pools";
+import { getPools } from "../helpers/queries/pools";
 import client from "../helpers/client";
 import { PendingAction } from "../helpers/types";
 import { fetchChatData } from "../helpers/utils";

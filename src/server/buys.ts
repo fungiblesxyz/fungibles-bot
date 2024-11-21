@@ -9,12 +9,11 @@ import {
   convertToPositive,
   _n,
   getEthUsdPrice,
-  getTokenHoldersCount,
   fetchChats,
 } from "../helpers/utils";
 import client from "../helpers/client";
 import { ChatResponse, ChatEntry } from "../helpers/types";
-
+import { getStats } from "../helpers/queries/stats";
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
 );
@@ -51,13 +50,9 @@ export async function monitorBuys() {
     ) as ChatResponse;
 
   let ethUsdPrice: number;
-  let holdersCounts: Record<string, number>;
 
   try {
-    [ethUsdPrice, holdersCounts] = await Promise.all([
-      getEthUsdPrice(client),
-      getTokenHoldersCount(chats, client),
-    ]);
+    ethUsdPrice = await getEthUsdPrice(client);
 
     if (ethUsdPrice === 0) {
       throw new Error("Failed to fetch ETH price");
@@ -125,7 +120,7 @@ export async function monitorBuys() {
               ethAmount,
               tokenAmount,
               ethUsdPrice,
-              holdersCounts
+              poolInfo.isWethToken0
             );
           }
         } catch (error) {
@@ -143,7 +138,7 @@ async function handleBuyEvent(
   ethAmount: bigint,
   tokenAmount: bigint,
   ethUsdPrice: number,
-  holdersCounts: Record<string, number>
+  isWethToken0: boolean
 ) {
   const matchingChats = Object.values(chats).filter(
     (chat) => chat.pools?.UniswapV3?.toLowerCase() === log.address.toLowerCase()
@@ -175,6 +170,13 @@ async function handleBuyEvent(
         throw new Error(`Failed to read balance: ${error}`);
       });
 
+    const stats = await getStats(
+      actualBuyer,
+      matchingChats[0].info.id,
+      log.address,
+      isWethToken0
+    );
+
     const formattedBalance = formatUnits(
       balance,
       Number(matchingChats[0].info.decimals)
@@ -205,12 +207,18 @@ async function handleBuyEvent(
       );
       const baseEmoji = chat.settings?.emoji ?? "🟢";
       const emojiString = baseEmoji.repeat(emojiCount);
-      const buyerPosition =
-        balance - BigInt(tokenAmount) > 0n
-          ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(
-              balanceAmountUsd
-            )})`
-          : "🌟 New Buyer!";
+      const isNewBuyer = balance - BigInt(tokenAmount) < 0n;
+      const buyerPosition = !isNewBuyer
+        ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(
+            balanceAmountUsd
+          )})`
+        : "🌟 New Buyer!";
+      const showHeldForDays = stats?.heldForDays && stats.heldForDays > 0;
+      const chadnessString = !isNewBuyer
+        ? `\n*Chadness:* ${
+            showHeldForDays ? `✋💎🤚 \\[${stats?.heldForDays} days\]` : "🧻👐"
+          }`
+        : "";
 
       const queryParams = {};
       const media = await getBuyMedia(chat, log.transactionHash, queryParams);
@@ -219,7 +227,7 @@ async function handleBuyEvent(
 ${emojiString}
 *Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
 *Received:* ${_n(amountOut)} ${chat.info.symbol}
-*Buyer:* ${shortenAddress(actualBuyer, true)}
+*Buyer:* ${shortenAddress(actualBuyer, true)} ${chadnessString}
 *Buyer Position:* ${buyerPosition}
 *Price:* $${_n(ethPricePerToken * ethUsdPrice)}
 *MarketCap:* $${_n(
