@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { bot } from "./bot/index";
 import { monitorBuys, updateChats } from "./server/buys";
-import { callAgent } from "./agents/index";
+// import { callAgent } from "./agents/index";
 
 require("dotenv").config();
 

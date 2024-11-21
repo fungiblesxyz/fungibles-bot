@@ -2,6 +2,9 @@ import { Bot, InlineKeyboard, type Context } from "grammy";
 import { getAddress, isAddress } from "viem";
 import { getPools } from "./pools";
 import client from "../helpers/client";
+import { PendingAction } from "../helpers/types";
+import { fetchChatData } from "../helpers/utils";
+// import { addAgentUserReply } from "../agents/index";
 import {
   handleSettingsCallback,
   handleChatEditCallback,
@@ -11,14 +14,12 @@ import {
   handleRemoveWebhook,
   handleRemoveMedia,
 } from "./callbacks";
-import { PendingAction } from "../helpers/types";
-import { fetchChatData } from "../helpers/utils";
 import {
   getMatchingChats,
   updateChatSettings,
   sendLogToChannel,
 } from "../helpers/bot";
-import { addAgentUserReply } from "../agents";
+
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
   process.exit(1);
@@ -88,7 +89,7 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.on("my_chat_member", handleChatMemberUpdate);
 bot.on("message", async (ctx) => {
-  addAgentUserReply(ctx);
+  // addAgentUserReply(ctx);
 
   const pendingAction = pendingActions.get(ctx.from.id);
 
@@ -280,6 +281,9 @@ async function handleChatMemberUpdate(ctx: Context) {
         const response = await fetch(process.env.CHATS_API_URL!, {
           method: "POST",
           body: JSON.stringify({ id: update.chat.id.toString() }),
+          headers: {
+            Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
+          },
         });
         if (!response.ok) {
           const errorMessage = await response.text();
@@ -301,6 +305,9 @@ async function handleChatMemberUpdate(ctx: Context) {
           `${process.env.CHATS_API_URL}/${update.chat.id}`,
           {
             method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
+            },
           }
         );
         console.log("🚀 ~ handleChatMemberUpdate ~ response:", response);
