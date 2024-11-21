@@ -1,13 +1,20 @@
+import OpenAI from "openai";
 import { Context } from "grammy";
 import { sendMessageToChat } from "../helpers/bot";
 import { botSystemMessage, communityTheme } from "./config";
 
 const API_URL = "https://api.x.ai/v1/chat/completions";
 
-if (!process.env.XAI_API_KEY) {
-  console.error("XAI_API_KEY must be set in the environment.");
+if (!process.env.XAI_API_KEY && !process.env.OPENAI_API_KEY) {
+  console.error(
+    "XAI_API_KEY or OPENAI_API_KEY must be set in the environment."
+  );
   process.exit(1);
 }
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const messages = [
   {
@@ -41,6 +48,21 @@ async function callXAIApi(messages: any[]) {
   return data.choices[0].message.content;
 }
 
+async function callOpenAIApi(messages: any[]) {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // or your preferred model
+      messages: messages,
+      temperature: 0,
+    });
+
+    return completion.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenAI API:", error);
+    throw error;
+  }
+}
+
 export async function callAgent() {
   try {
     const content = await callXAIApi(messages);
@@ -63,7 +85,7 @@ export async function callAgent() {
 
     console.log(content);
   } catch (error) {
-    console.error("Error calling xAI API:", error);
+    console.error("Error calling API:", error);
   }
 }
 

@@ -23,14 +23,9 @@ export const updateChatsJob = new CronJob(
 monitorBuys();
 updateChatsJob.start();
 
-// Start the agent job
-export const callAgentJob = new CronJob(
-  "0 */15 * * * *", // every 15 minutes
-  callAgent,
-  null,
-  true,
-  undefined,
-  undefined,
-  true
-);
-callAgentJob.start();
+// // Start the agent job
+// export const callAgentJob = new CronJob(
+//   "0 */15 * * * *", // every 15 minutes
+//   callAgent
+// );
+// callAgentJob.start();
