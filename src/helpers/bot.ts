@@ -95,6 +95,7 @@ export async function updateChatSettings(
       body: JSON.stringify(updateData),
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
       },
     });
 
