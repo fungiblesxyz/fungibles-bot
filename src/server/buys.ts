@@ -23,10 +23,12 @@ const ERC20_BALANCE_ABI = parseAbiItem(
 );
 
 let chats: ChatResponse;
+let ethUsdPrice: number;
 
-export async function updateChats() {
+export async function refreshData() {
   try {
     chats = await fetchChats();
+    ethUsdPrice = await getEthUsdPrice(client);
   } catch (error) {
     console.error("Failed to update chats:", error);
     sendLogToChannel(`Failed to update chats: ${error}`);
@@ -38,7 +40,7 @@ export async function updateChats() {
 }
 
 export async function monitorBuys() {
-  await updateChats();
+  await refreshData();
   chats = Object.entries(chats)
     .filter(([_, chat]) => chat?.info?.id)
     .reduce(
@@ -49,18 +51,8 @@ export async function monitorBuys() {
       {}
     ) as ChatResponse;
 
-  let ethUsdPrice: number;
-
-  try {
-    ethUsdPrice = await getEthUsdPrice(client);
-
-    if (ethUsdPrice === 0) {
-      throw new Error("Failed to fetch ETH price");
-    }
-  } catch (error) {
-    console.error("Failed to fetch critical data:", error);
-    sendLogToChannel(`Failed to fetch critical data: ${error}`);
-    return; // Exit monitoring if we can't get critical data
+  if (ethUsdPrice === 0) {
+    throw new Error("ETH price is 0");
   }
 
   const v3Pools = Object.values(chats)
