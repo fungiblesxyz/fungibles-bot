@@ -123,22 +123,25 @@ async function handleStartCommand(ctx: Context) {
     .text("⚙️ Settings", "settings");
 
   return ctx.reply(
-    `Welcome to Fungibles Bot - Your Ultimate ERC20i Token Bot!
+    `Welcome to Fungibles Bot!
+
+To get started, add me to your group and configure token tracking settings!
 
 ✨ Unique Features:
-• Specialized tracking for ERC20i tokens
-• Diamond Hands Indicator for smart buys
+• Custom ERC20i features
+• Buyer status indicator
 
 💎 Built by ERC20i bulls, for the community:
-• 100% Ad-free
-• Free and open-source
-
-🌐 Visit: fungibles.xyz
-💬 Join our community: @fungibles_ERC20i
-
-To get started, add me to your group and configure token tracking settings!`,
+• 100% free and open-source
+    
+[Website](https://fungibles.xyz) | [Telegram](https://t.me/fungibles_ERC20i) | [Suggestions](https://fungibles.canny.io/suggestions) | [Support Us](https://app.safe.global/balances?safe=base:0x45083345B7E20d9916dDa046344Ec518bf9e21D0)
+    `,
     {
       reply_markup: mainMenu,
+      parse_mode: "Markdown",
+      link_preview_options: {
+        is_disabled: true,
+      },
     }
   );
 }
