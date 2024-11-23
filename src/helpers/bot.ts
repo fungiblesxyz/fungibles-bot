@@ -136,11 +136,18 @@ export async function sendLogToChannel(
     const prefix = process.env.NODE_ENV === "test" ? "[TEST] " : "";
     const chatInfo = options.chatId ? `[Chat: ${options.chatId}] ` : "";
     const emoji = !options.type ? "🚨" : "📝";
+
+    // Escape special Markdown characters
+    const escapedMessage = message.replace(
+      /([_*\[\]()~`>#+\-=|{}.!])/g,
+      "\\$1"
+    );
+
     await bot.api.sendMessage(
       "-1002420548293",
       `${prefix}${chatInfo}${emoji} ${
         !options.type ? "Error Log:" : "Log:"
-      }\n${message}`,
+      }\n${escapedMessage}`,
       {
         parse_mode: "Markdown",
         message_thread_id: 2,
