@@ -45,3 +45,26 @@ export interface ChatEntry {
 export interface ChatResponse {
   [key: string]: ChatEntry;
 }
+
+export interface BuyEventData {
+  buyer: {
+    address: string;
+    balance: bigint;
+    formattedBalance: string;
+    isNew: boolean;
+    stats: any; // Consider creating a proper type for stats
+  };
+  amounts: {
+    in: string;
+    out: string;
+    spentUsd: number;
+    balanceUsd: number;
+  };
+  prices: {
+    ethPerToken: number;
+    ethUsd: number;
+  };
+  transaction: {
+    hash: string;
+  };
+}

@@ -12,7 +12,7 @@ import {
   fetchChats,
 } from "../helpers/utils";
 import client from "../helpers/client";
-import { ChatResponse, ChatEntry } from "../helpers/types";
+import { ChatResponse, ChatEntry, BuyEventData } from "../helpers/types";
 import { getStats } from "../helpers/queries/stats";
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
@@ -124,6 +124,48 @@ export async function monitorBuys() {
   });
 }
 
+async function formatBuyMessage(chat: ChatEntry, data: BuyEventData) {
+  const emojiCount = Math.max(
+    1,
+    Math.floor(data.amounts.spentUsd / (chat.settings?.minBuyAmount ?? 10))
+  );
+  const baseEmoji = chat.settings?.emoji ?? "🟢";
+  const emojiString = baseEmoji.repeat(emojiCount);
+
+  const buyerPosition = `${_n(data.buyer.formattedBalance)} ${
+    chat.info.symbol
+  } ($${_n(data.amounts.balanceUsd)})`;
+
+  const heldForDays = data.buyer.stats?.heldForDays;
+
+  const marketCapUsd = _n(
+    Number(chat.info.totalSupply) * data.prices.ethPerToken * data.prices.ethUsd
+  );
+
+  let buyerStatus;
+  if (heldForDays < 7) buyerStatus = "🌟 New Buyer";
+  if (heldForDays >= 7) buyerStatus = "🦾 Iron Hands";
+  if (heldForDays >= 30) buyerStatus = "💎 Diamond Hands";
+  if (data.buyer.balance <= 0) buyerStatus = "⚡ Quick Flip";
+
+  let messageLines = [
+    `*${chat.info.symbol} Buy!*`,
+    emojiString,
+    `*Spent:* ${_n(data.amounts.in)} WETH ($${_n(data.amounts.spentUsd)})`,
+    `*Received:* ${_n(data.amounts.out)} ${chat.info.symbol}`,
+    `*Buyer:* ${shortenAddress(data.buyer.address, true)}`,
+    `*Buyer Status:* ${buyerStatus}`,
+    data.buyer.balance > 0 && `*Buyer Position:* ${buyerPosition}`,
+    `*Price:* $${_n(data.prices.ethPerToken * data.prices.ethUsd)}`,
+    `*MarketCap:* $${marketCapUsd}`,
+    `\n[TX](https://basescan.org/tx/${data.transaction.hash}) | [DEX](https://dexscreener.com/base/${chat.info.id}) | [BUY](https://app.uniswap.org/explore/tokens/base/${chat.info.id})`,
+  ];
+
+  messageLines = messageLines.filter((line) => line);
+
+  return messageLines.join("\n");
+}
+
 async function handleBuyEvent(
   log: any,
   chats: ChatResponse,
@@ -193,50 +235,45 @@ async function handleBuyEvent(
         continue;
       }
 
-      const emojiCount = Math.max(
-        1,
-        Math.floor(spentAmountUsd / (chat.settings?.minBuyAmount ?? 10))
-      );
-      const baseEmoji = chat.settings?.emoji ?? "🟢";
-      const emojiString = baseEmoji.repeat(emojiCount);
-      const isNewBuyer = balance - BigInt(tokenAmount) < 0n;
-      const buyerPosition = !isNewBuyer
-        ? `${_n(formattedBalance)} ${chat.info.symbol} ($${_n(
-            balanceAmountUsd
-          )})`
-        : "🌟 New Buyer!";
-      const showHeldForDays = stats?.heldForDays && stats.heldForDays > 0;
-      const chadnessString = !isNewBuyer
-        ? `\n*Chadness:* ${
-            showHeldForDays ? `✋💎🤚 \\[${stats?.heldForDays} days\]` : "🧻👐"
-          }`
-        : "";
+      const buyEventData: BuyEventData = {
+        buyer: {
+          address: actualBuyer,
+          balance,
+          formattedBalance,
+          isNew: balance - BigInt(tokenAmount) < 0n,
+          stats,
+        },
+        amounts: {
+          in: amountIn,
+          out: amountOut,
+          spentUsd: spentAmountUsd,
+          balanceUsd: balanceAmountUsd,
+        },
+        prices: {
+          ethPerToken: ethPricePerToken,
+          ethUsd: ethUsdPrice,
+        },
+        transaction: {
+          hash: log.transactionHash,
+        },
+      };
 
-      const queryParams = {};
-      const media = await getBuyMedia(chat, log.transactionHash, queryParams);
-      const message = `
-*${chat.info.symbol} Buy!*
-${emojiString}
-*Spent:* ${_n(amountIn)} WETH ($${_n(spentAmountUsd)})
-*Received:* ${_n(amountOut)} ${chat.info.symbol}
-*Buyer:* ${shortenAddress(actualBuyer, true)} ${chadnessString}
-*Buyer Position:* ${buyerPosition}
-*Price:* $${_n(ethPricePerToken * ethUsdPrice)}
-*MarketCap:* $${_n(
-        Number(chat.info.totalSupply) * ethPricePerToken * ethUsdPrice
-      )}
+      const message = await formatBuyMessage(chat, buyEventData);
 
-[TX](${`https://basescan.org/tx/${log.transactionHash}`}) | [DEX](${`https://dexscreener.com/base/${chat.info.id}`}) | [BUY](${`https://app.uniswap.org/explore/tokens/base/${chat.info.id}`})
-      `;
-
-      if (media?.data && media.type) {
-        await sendMediaToChat(
-          chat.id,
-          media.data,
-          media.type,
-          message,
-          chat.threadId
-        );
+      if (chat.settings?.imageWebhookUrl && log.transactionHash) {
+        const queryParams = {};
+        const media = await getBuyMedia(chat, log.transactionHash, queryParams);
+        if (media?.data && media.type) {
+          await sendMediaToChat(
+            chat.id,
+            media.data,
+            media.type,
+            message,
+            chat.threadId
+          );
+        } else {
+          await sendMessageToChat(chat.id, message, chat.threadId);
+        }
       } else {
         await sendMessageToChat(chat.id, message, chat.threadId);
       }
