@@ -18,6 +18,7 @@ import {
   getMatchingChats,
   updateChatSettings,
   sendLogToChannel,
+  sendMessageToChat,
 } from "../helpers/bot";
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -113,7 +114,17 @@ bot.on("message", async (ctx) => {
 
 async function handleStartCommand(ctx: Context) {
   if (ctx.chat?.type !== "private") {
-    return ctx.reply("This command can only be used in group private chats.");
+    const button = new InlineKeyboard().url(
+      "Click Me",
+      `https://t.me/${ctx.me.username}`
+    );
+
+    return ctx.reply(
+      "⬇️ Click the button below to proceed the setup in private chat!",
+      {
+        reply_markup: button,
+      }
+    );
   }
 
   const mainMenu = new InlineKeyboard()
@@ -285,6 +296,10 @@ async function handleChatMemberUpdate(ctx: Context) {
     case "member":
     case "administrator":
       try {
+        await sendMessageToChat(
+          update.chat.id.toString(),
+          `👋 Hey, I am FungiblesBot, your favorite ERC20i bot!`
+        );
         sendLogToChannel(
           `Chat ${update.chat.id} added the bot to their group`,
           {
