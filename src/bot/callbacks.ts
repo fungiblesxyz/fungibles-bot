@@ -128,7 +128,7 @@ export async function handleMediaCallback(
     keyboard
       .text("➕ Add Media (Image/Video)", `chat-edit_${chatId}_media`)
       .row()
-      .text("🔗 Set Webhook URL", `chat-edit_${chatId}_imageWebhook`)
+      .text("🔗 Set Custom Webhook", `chat-edit_${chatId}_imageWebhook`)
       .row();
   } else if (webhookUrl) {
     keyboard.text("❌ Remove URL", `chat-remove_${chatId}_webhook`);
