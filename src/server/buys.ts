@@ -127,7 +127,7 @@ export async function monitorBuys() {
 async function formatBuyMessage(chat: ChatEntry, data: BuyEventData) {
   const emojiCount = Math.max(
     1,
-    Math.floor(data.amounts.spentUsd / (chat.settings?.minBuyAmount ?? 10))
+    Math.floor(data.amounts.spentUsd / (chat.settings?.emojiStepAmount ?? 10))
   );
   const baseEmoji = chat.settings?.emoji ?? "🟢";
   const emojiString = baseEmoji.repeat(emojiCount);

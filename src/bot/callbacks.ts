@@ -53,6 +53,7 @@ export async function handleChatEditCallback(
       "➡️ Send your image URL (must start with http:// or https://)",
     minBuy:
       "➡️ Send minimum buy amount in USD to trigger alerts (e.g., 100). Buys below this amount will be ignored.",
+    emojiStep: "➡️ Send emoji step amount in USD (e.g., 100).",
     media: "➡️ Send your image or video directly to this chat",
   };
 
@@ -90,8 +91,13 @@ Select an action:`,
         .text(`🖼 Manage Buy Media`, `chat-media_${chatData.id}`)
         .row()
         .text(
-          `💵 Min Buy Alert: $${chatData.settings?.minBuyAmount ?? "0"}`,
+          `📢 Min Alert Amount: $${chatData.settings?.minBuyAmount ?? "0"}`,
           `chat-edit_${chatData.id}_minBuy`
+        )
+        .row()
+        .text(
+          `📶 Emoji Step Amount: $${chatData.settings?.emojiStepAmount ?? "0"}`,
+          `chat-edit_${chatData.id}_emojiStep`
         )
         .row()
         .text("Cancel", "cancel"),

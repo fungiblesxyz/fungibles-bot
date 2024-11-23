@@ -3,6 +3,7 @@ export type ActionType =
   | "emoji"
   | "imageWebhook"
   | "minBuy"
+  | "emojiStep"
   | "media";
 
 export interface PendingAction {
@@ -33,6 +34,7 @@ export interface ChatEntry {
     emoji?: string;
     imageUrl?: string;
     minBuyAmount?: number;
+    emojiStepAmount?: number;
     thresholds?: {
       threshold: number;
       fileId: string;

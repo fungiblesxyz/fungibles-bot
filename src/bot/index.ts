@@ -103,6 +103,8 @@ bot.on("message", async (ctx) => {
         return handleImageWebhookUpdate(ctx, pendingAction.chatId);
       case "minBuy":
         return handleMinBuyUpdate(ctx, pendingAction.chatId);
+      case "emojiStep":
+        return handleEmojiStepUpdate(ctx, pendingAction.chatId);
       case "media":
         return handleMediaMessage(ctx, pendingAction.chatId);
     }
@@ -341,4 +343,22 @@ async function handleChatMemberUpdate(ctx: Context) {
       }
       break;
   }
+}
+async function handleEmojiStepUpdate(ctx: Context, chatId: string) {
+  const emojiStepAmount = ctx.message?.text?.trim() ?? "";
+
+  if (!/^\d+(\.\d+)?$/.exec(emojiStepAmount)) {
+    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
+      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+    });
+  }
+
+  return updateChatSettings(
+    ctx,
+    pendingActions,
+    chatId,
+    { settings: { emojiStepAmount } },
+    "✅ Emoji step amount updated successfully!",
+    "❌ Failed to update emoji step amount"
+  );
 }
