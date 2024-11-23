@@ -155,14 +155,22 @@ export async function handleMediaCallback(
         reply_markup: keyboard,
       });
     }
-    await ctx.deleteMessage();
+    try {
+      await ctx.deleteMessage();
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+    }
   } else {
-    await ctx.editMessageText(messageText, {
-      link_preview_options: {
-        is_disabled: true,
-      },
-      reply_markup: keyboard,
-    });
+    try {
+      await ctx.editMessageText(messageText, {
+        link_preview_options: {
+          is_disabled: true,
+        },
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+    }
   }
 }
 
@@ -192,7 +200,11 @@ export async function handleRemoveWebhook(ctx: Context, chatId: string) {
     "✅ Webhook URL removed successfully!",
     "❌ Failed to remove webhook URL"
   );
-  await ctx.deleteMessage();
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.error("Failed to delete message:", error);
+  }
   return result;
 }
 
@@ -209,6 +221,10 @@ export async function handleRemoveMedia(ctx: Context, chatId: string) {
     "✅ Media removed successfully!",
     "❌ Failed to remove media"
   );
-  await ctx.deleteMessage();
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.error("Failed to delete message:", error);
+  }
   return result;
 }
