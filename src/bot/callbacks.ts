@@ -111,6 +111,7 @@ export async function handleMediaCallback(
   chatData: ChatEntry
 ) {
   const webhookUrl = chatData.settings?.customWebhookUrl;
+  const hasMedia = chatData.settings?.thresholds?.[0];
 
   let messageText = " ";
 
