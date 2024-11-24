@@ -40,7 +40,7 @@ export interface ChatEntry {
       fileId: string;
       type: "photo" | "video" | "animation";
     }[];
-    imageWebhookUrl?: string;
+    customWebhookUrl?: string;
   };
 }
 

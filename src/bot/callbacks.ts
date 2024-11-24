@@ -110,8 +110,7 @@ export async function handleMediaCallback(
   chatId: string,
   chatData: ChatEntry
 ) {
-  const webhookUrl = chatData.settings?.imageWebhookUrl;
-  const hasMedia = chatData.settings?.thresholds?.[0];
+  const webhookUrl = chatData.settings?.customWebhookUrl;
 
   let messageText = " ";
 
@@ -194,7 +193,7 @@ export async function handleRemoveWebhook(ctx: Context, chatId: string) {
     chatId,
     {
       settings: {
-        imageWebhookUrl: null,
+        customWebhookUrl: null,
       },
     },
     "✅ Webhook URL removed successfully!",

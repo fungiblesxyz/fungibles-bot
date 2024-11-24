@@ -203,9 +203,9 @@ async function handleEmojiUpdate(ctx: Context, chatId: string) {
 }
 
 async function handleImageWebhookUpdate(ctx: Context, chatId: string) {
-  const imageWebhookUrl = ctx.message?.text?.trim() ?? "";
+  const customWebhookUrl = ctx.message?.text?.trim() ?? "";
 
-  if (!/^https?:\/\/.+/i.exec(imageWebhookUrl)) {
+  if (!/^https?:\/\/.+/i.exec(customWebhookUrl)) {
     return ctx.reply(
       "❌ Please provide a valid image URL starting with http:// or https://",
       {
@@ -218,7 +218,7 @@ async function handleImageWebhookUpdate(ctx: Context, chatId: string) {
     ctx,
     pendingActions,
     chatId,
-    { settings: { imageWebhookUrl } },
+    { settings: { customWebhookUrl } },
     "✅ Image URL updated successfully!",
     "❌ Failed to update image URL"
   );

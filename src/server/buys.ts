@@ -260,9 +260,12 @@ async function handleBuyEvent(
 
       const message = await formatBuyMessage(chat, buyEventData);
 
-      if (chat.settings?.imageWebhookUrl && log.transactionHash) {
-        const queryParams = {};
-        const media = await getBuyMedia(chat, log.transactionHash, queryParams);
+      if (log.transactionHash) {
+        const media = await getBuyMedia(
+          chat,
+          log.transactionHash,
+          spentAmountUsd
+        );
         if (media?.data && media.type) {
           await sendMediaToChat(
             chat.id,
@@ -290,11 +293,13 @@ async function handleBuyEvent(
 async function getBuyMedia(
   chat: ChatEntry,
   transactionHash: string,
-  queryParams: Record<string, string>
+  spentUsd: number
 ) {
-  if (chat.settings?.imageWebhookUrl && transactionHash) {
+  const queryParams = {};
+
+  if (chat.settings?.customWebhookUrl && transactionHash) {
     const queryString = new URLSearchParams(queryParams);
-    const webhookUrl = `${chat.settings.imageWebhookUrl}/${transactionHash}?${queryString}`;
+    const webhookUrl = `${chat.settings.customWebhookUrl}/${transactionHash}?${queryString}`;
 
     try {
       const response = await fetch(webhookUrl);
@@ -336,12 +341,18 @@ async function getBuyMedia(
     }
   }
 
-  const imageData = chat.settings?.thresholds?.[0];
-  if (imageData) {
-    return {
-      data: imageData.fileId,
-      type: imageData.type,
-    };
+  const thresholds = chat.settings?.thresholds;
+  if (thresholds?.length) {
+    const appropriateThreshold = thresholds
+      .filter((t) => t.threshold <= spentUsd)
+      .sort((a, b) => b.threshold - a.threshold)[0];
+
+    if (appropriateThreshold) {
+      return {
+        data: appropriateThreshold.fileId,
+        type: appropriateThreshold.type,
+      };
+    }
   }
 
   return null;
