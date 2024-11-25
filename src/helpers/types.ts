@@ -1,5 +1,5 @@
 export type ActionType =
-  | "token"
+  | "setup"
   | "emoji"
   | "imageWebhook"
   | "minBuy"
@@ -7,6 +7,7 @@ export type ActionType =
   | "media";
 
 export interface PendingAction {
+  callbackData: string;
   chatId: string;
   action: ActionType;
   promptMessage: string;
