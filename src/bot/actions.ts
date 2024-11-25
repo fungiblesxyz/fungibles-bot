@@ -4,11 +4,13 @@ import { Context, InlineKeyboard } from "grammy";
 const PROMPT_MESSAGES: Record<ActionType, string> = {
   setup: "➡️ Send your token address",
   emoji: "➡️ Send your preferred emoji",
-  imageWebhook: "➡️ Send your image URL (must start with http:// or https://)",
   minBuy:
     "➡️ Send minimum buy amount in USD to trigger alerts (e.g., 100). Buys below this amount will be ignored.",
   emojiStep: "➡️ Send emoji step amount in USD (e.g., 100).",
-  media: "➡️ Send your image or video directly to this chat",
+  thresholdAmount: "➡️ Send your threshold amount in USD (e.g., 100).",
+  thresholdMedia: "➡️ Send your image or video directly to this chat",
+  thresholdWebhook:
+    "➡️ Send your media URL (must start with http:// or https://)",
 };
 
 class ActionStore {
@@ -24,16 +26,21 @@ class ActionStore {
     return this.pendingActions.get(userId);
   }
 
-  async setPendingAction(ctx: Context, action: ActionType): Promise<void> {
+  async setPendingAction(
+    ctx: Context,
+    action: ActionType,
+    data?: any
+  ): Promise<void> {
     if (!ctx.from) return;
 
     if (!action) return console.error("No action found");
 
     this.pendingActions.set(ctx.from.id, {
       callbackData: ctx.callbackQuery?.data ?? "",
-      chatId: ctx.chat?.id.toString() ?? "",
+      chatId: this.getCurrentChatId(),
       action,
       promptMessage: PROMPT_MESSAGES[action],
+      data,
     });
 
     await ctx.editMessageText(PROMPT_MESSAGES[action], {

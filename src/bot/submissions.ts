@@ -2,9 +2,10 @@ import { Context, InlineKeyboard } from "grammy";
 import { isAddress, getAddress } from "viem";
 import client from "../helpers/client";
 import { getPools } from "../helpers/queries/pools";
-import { patchChatSettings } from "./utils";
+import { patchChatSettings, mergeThreshold } from "./utils";
 import { actionStore } from "./actions";
-
+import { showThresholdSetup } from "./callbacks";
+import { PendingAction } from "../helpers/types";
 export async function handleMessageSubmission(ctx: Context) {
   if (!ctx.from) return;
   const pendingAction = actionStore.getPendingAction(ctx.from.id);
@@ -12,23 +13,25 @@ export async function handleMessageSubmission(ctx: Context) {
   if (!pendingAction) return;
   switch (pendingAction.action) {
     case "setup":
-      return handleTokenAddressSubmission(ctx, pendingAction.chatId);
+      return handleTokenAddressSubmission(ctx, pendingAction);
     case "emoji":
-      return handleEmojiSubmission(ctx, pendingAction.chatId);
-    case "imageWebhook":
-      return handleWebhookUrlSubmission(ctx, pendingAction.chatId);
+      return handleEmojiSubmission(ctx, pendingAction);
     case "minBuy":
-      return handleMinBuyAmountSubmission(ctx, pendingAction.chatId);
+      return handleMinBuyAmountSubmission(ctx, pendingAction);
     case "emojiStep":
-      return handleEmojiStepAmountSubmission(ctx, pendingAction.chatId);
-    case "media":
-      return handleMediaSubmission(ctx, pendingAction.chatId);
+      return handleEmojiStepAmountSubmission(ctx, pendingAction);
+    case "thresholdAmount":
+      return handleThresholdAmountSubmission(ctx, pendingAction);
+    case "thresholdMedia":
+      return handleThresholdMediaSubmission(ctx, pendingAction);
+    case "thresholdWebhook":
+      return handleThresholdWebhookUrlSubmission(ctx, pendingAction);
   }
 }
 
 export async function handleTokenAddressSubmission(
   ctx: Context,
-  chatId: string
+  pendingAction: PendingAction
 ) {
   const text = ctx.message?.text?.trim().toLowerCase() ?? "";
 
@@ -52,48 +55,30 @@ export async function handleTokenAddressSubmission(
 
   return patchChatSettings(
     ctx,
-    chatId,
+    pendingAction.chatId,
     tokenData,
     "✅ Token address saved successfully!",
     "❌ Failed to save token address"
   );
 }
 
-export async function handleEmojiSubmission(ctx: Context, chatId: string) {
+export async function handleEmojiSubmission(
+  ctx: Context,
+  pendingAction: PendingAction
+) {
   const emoji = ctx.message?.text?.trim() ?? "";
   return patchChatSettings(
     ctx,
-    chatId,
+    pendingAction.chatId,
     { settings: { emoji } },
     "✅ Emoji updated successfully!",
     "❌ Failed to update emoji"
   );
 }
 
-export async function handleWebhookUrlSubmission(ctx: Context, chatId: string) {
-  const customWebhookUrl = ctx.message?.text?.trim() ?? "";
-
-  if (!/^https?:\/\/.+/i.exec(customWebhookUrl)) {
-    return ctx.reply(
-      "❌ Please provide a valid image URL starting with http:// or https://",
-      {
-        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-      }
-    );
-  }
-
-  return patchChatSettings(
-    ctx,
-    chatId,
-    { settings: { customWebhookUrl } },
-    "✅ Image URL updated successfully!",
-    "❌ Failed to update image URL"
-  );
-}
-
 export async function handleMinBuyAmountSubmission(
   ctx: Context,
-  chatId: string
+  pendingAction: PendingAction
 ) {
   const minBuyAmount = ctx.message?.text?.trim() ?? "";
 
@@ -105,14 +90,81 @@ export async function handleMinBuyAmountSubmission(
 
   return patchChatSettings(
     ctx,
-    chatId,
+    pendingAction.chatId,
     { settings: { minBuyAmount } },
     "✅ Minimum buy amount updated successfully!",
     "❌ Failed to update minimum buy amount"
   );
 }
 
-export async function handleMediaSubmission(ctx: Context, chatId: string) {
+export async function handleEmojiStepAmountSubmission(
+  ctx: Context,
+  pendingAction: PendingAction
+) {
+  const emojiStepAmount = ctx.message?.text?.trim() ?? "";
+
+  if (!/^\d+(\.\d+)?$/.exec(emojiStepAmount)) {
+    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
+      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+    });
+  }
+
+  return patchChatSettings(
+    ctx,
+    pendingAction.chatId,
+    { settings: { emojiStepAmount } },
+    "✅ Emoji step amount updated successfully!",
+    "❌ Failed to update emoji step amount"
+  );
+}
+
+export async function handleThresholdAmountSubmission(
+  ctx: Context,
+  pendingAction: PendingAction
+) {
+  const threshold = ctx.message?.text?.trim() ?? "";
+
+  actionStore.deletePendingAction(ctx.from?.id!);
+  return showThresholdSetup(ctx, threshold);
+}
+
+export async function handleThresholdWebhookUrlSubmission(
+  ctx: Context,
+  pendingAction: PendingAction
+) {
+  const customWebhookUrl = ctx.message?.text?.trim() ?? "";
+
+  if (!/^https?:\/\/.+/i.exec(customWebhookUrl)) {
+    return ctx.reply(
+      "❌ Please provide a valid image URL starting with http:// or https://",
+      {
+        reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
+      }
+    );
+  }
+
+  const newThreshold = {
+    threshold: Number(pendingAction.data),
+    customWebhookUrl,
+  };
+
+  return patchChatSettings(
+    ctx,
+    pendingAction.chatId,
+    {
+      settings: {
+        thresholds: await mergeThreshold(pendingAction.chatId, newThreshold),
+      },
+    },
+    "✅ Webhook URL set successfully!",
+    "❌ Failed to set webhook URL"
+  );
+}
+
+export async function handleThresholdMediaSubmission(
+  ctx: Context,
+  pendingAction: PendingAction
+) {
   let mediaFileId: string | undefined;
   let mediaType: "photo" | "video" | "animation" | undefined;
 
@@ -134,42 +186,21 @@ export async function handleMediaSubmission(ctx: Context, chatId: string) {
     return;
   }
 
-  return patchChatSettings(
-    ctx,
-    chatId,
-    {
-      settings: {
-        thresholds: [
-          {
-            threshold: 0,
-            fileId: mediaFileId,
-            type: mediaType,
-          },
-        ],
-      },
-    },
-    "✅ Media saved successfully!",
-    "❌ Failed to save media"
-  );
-}
-
-export async function handleEmojiStepAmountSubmission(
-  ctx: Context,
-  chatId: string
-) {
-  const emojiStepAmount = ctx.message?.text?.trim() ?? "";
-
-  if (!/^\d+(\.\d+)?$/.exec(emojiStepAmount)) {
-    return ctx.reply("❌ Please provide a valid number in USD (e.g., 100).", {
-      reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-    });
-  }
-
-  return patchChatSettings(
-    ctx,
-    chatId,
-    { settings: { emojiStepAmount } },
-    "✅ Emoji step amount updated successfully!",
-    "❌ Failed to update emoji step amount"
-  );
+  //   return patchChatSettings(
+  //     ctx,
+  //     chatId,
+  //     {
+  //       settings: {
+  //         thresholds: [
+  //           {
+  //             threshold: 0,
+  //             fileId: mediaFileId,
+  //             type: mediaType,
+  //           },
+  //         ],
+  //       },
+  //     },
+  //     "✅ Media saved successfully!",
+  //     "❌ Failed to save media"
+  //   );
 }

@@ -2,10 +2,9 @@ import { Context } from "grammy";
 import { fetchChatData } from "../helpers/utils";
 import { actionStore } from "./actions";
 import {
-  handleRemoveWebhook,
   handleRemoveMedia,
   showChatSettings,
-  showMediaSettings,
+  showThresholds,
 } from "./callbacks";
 
 type CallbackHandler = (ctx: Context, ...args: string[]) => Promise<any>;
@@ -36,12 +35,6 @@ const routes: RouteConfig[] = [
     },
   },
   {
-    prefix: "chat-set_imageWebhook",
-    handler: async (ctx) => {
-      return actionStore.setPendingAction(ctx, "emojiStep");
-    },
-  },
-  {
     prefix: "chat-set_minBuy",
     handler: async (ctx) => {
       return actionStore.setPendingAction(ctx, "minBuy");
@@ -54,22 +47,34 @@ const routes: RouteConfig[] = [
     },
   },
   {
-    prefix: "chat-set_media",
+    prefix: "chat-set_threshold-amount",
     handler: async (ctx, chatId) => {
-      const chatData = await fetchChatData(chatId);
-      return showMediaSettings(ctx, chatId, chatData);
+      return actionStore.setPendingAction(ctx, "thresholdAmount");
     },
   },
   {
-    prefix: "chat-remove_webhook",
-    handler: async (ctx, chatId) => {
-      return handleRemoveWebhook(ctx, chatId);
+    prefix: "chat-set_threshold-media",
+    handler: async (ctx, chatId, amount) => {
+      return actionStore.setPendingAction(ctx, "thresholdMedia", amount);
+    },
+  },
+  {
+    prefix: "chat-set_threshold-webhook",
+    handler: async (ctx, chatId, amount) => {
+      console.log("🚀 ~ handler: ~ amount:", amount);
+      return actionStore.setPendingAction(ctx, "thresholdWebhook", amount);
     },
   },
   {
     prefix: "chat-remove_media",
     handler: async (ctx, chatId) => {
       return handleRemoveMedia(ctx, chatId);
+    },
+  },
+  {
+    prefix: "chat-thresholds",
+    handler: async (ctx, chatId) => {
+      return showThresholds(ctx, chatId);
     },
   },
 ];
@@ -79,7 +84,10 @@ export const handleRouteCallback = async (ctx: any) => {
 
   for (const route of routes) {
     if (callbackData.startsWith(route.prefix)) {
-      const params = callbackData.replace(route.prefix, "").split("_");
+      const params = callbackData
+        .replace(route.prefix, "")
+        .split("_")
+        .filter((p: string) => p !== "");
 
       if (callbackData.split("#")[1]) {
         actionStore.setCurrentChatId(callbackData.split("#")[1]);
@@ -94,6 +102,6 @@ export const handleRouteCallback = async (ctx: any) => {
     }
   }
 
-  console.log("Unknown button event with payload:", callbackData);
+  console.error("Unknown button event with payload:", callbackData);
   return ctx.answerCallbackQuery();
 };

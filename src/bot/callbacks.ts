@@ -1,5 +1,5 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { ChatEntry } from "../helpers/types";
+import { ChatEntry, Threshold } from "../helpers/types";
 import { sendLogToChannel } from "../helpers/bot";
 import { patchChatSettings } from "./utils";
 import { fetchChatData } from "../helpers/utils";
@@ -61,7 +61,7 @@ Select an action:`,
           `chat-set_emoji`
         )
         .row()
-        .text(`🖼 Manage Buy Media`, `chat-set_media`)
+        .text(`🖼 Manage Buy Media`, `chat-thresholds`)
         .row()
         .text(
           `📢 Min Alert Amount: $${chatData.settings?.minBuyAmount ?? "0"}`,
@@ -78,94 +78,94 @@ Select an action:`,
   );
 }
 
-export async function showMediaSettings(
-  ctx: Context,
-  chatId: string,
-  chatData: ChatEntry
-) {
-  const webhookUrl = chatData.settings?.customWebhookUrl;
-  const hasMedia = chatData.settings?.thresholds?.[0];
+// export async function showMediaSettings(
+//   ctx: Context,
+//   chatId: string,
+//   chatData: ChatEntry
+// ) {
+//   const webhookUrl = chatData.settings?.customWebhookUrl;
+//   const hasMedia = chatData.settings?.thresholds?.[0];
 
-  let messageText = " ";
+//   let messageText = " ";
 
-  if (webhookUrl) {
-    messageText += `Current URL: ${webhookUrl}\n`;
-  }
-  if (!hasMedia && !webhookUrl) {
-    messageText += "Choose an option:";
-  }
+//   if (webhookUrl) {
+//     messageText += `Current URL: ${webhookUrl}\n`;
+//   }
+//   if (!hasMedia && !webhookUrl) {
+//     messageText += "Choose an option:";
+//   }
 
-  const keyboard = new InlineKeyboard();
+//   const keyboard = new InlineKeyboard();
 
-  if (!webhookUrl && !hasMedia) {
-    keyboard
-      .text("➕ Add Media (Image/Video)", `chat-set_media`)
-      .row()
-      .text("🔗 Set Custom Webhook", `chat-set_imageWebhook`)
-      .row();
-  } else if (webhookUrl) {
-    keyboard.text("❌ Remove URL", `chat-remove_webhook`);
-  } else if (hasMedia) {
-    keyboard.text("❌ Remove Media", `chat-remove_media`);
-  }
+//   if (!webhookUrl && !hasMedia) {
+//     keyboard
+//       .text("➕ Add Media (Image/Video)", `chat-set_media`)
+//       .row()
+//       .text("🔗 Set Custom Webhook", `chat-set_imageWebhook`)
+//       .row();
+//   } else if (webhookUrl) {
+//     keyboard.text("❌ Remove URL", `chat-remove_webhook`);
+//   } else if (hasMedia) {
+//     keyboard.text("❌ Remove Media", `chat-remove_media`);
+//   }
 
-  keyboard.text("Cancel", "cancel");
+//   keyboard.text("Cancel", "cancel");
 
-  if (hasMedia) {
-    if (hasMedia.type === "photo") {
-      await ctx.replyWithPhoto(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    } else if (hasMedia.type === "video") {
-      await ctx.replyWithVideo(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    } else if (hasMedia.type === "animation") {
-      await ctx.replyWithAnimation(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    }
-    try {
-      await ctx.deleteMessage();
-    } catch (error) {
-      console.error("Failed to delete message:", error);
-    }
-  } else {
-    try {
-      await ctx.editMessageText(messageText, {
-        link_preview_options: {
-          is_disabled: true,
-        },
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      console.error("Failed to edit message:", error);
-    }
-  }
-}
+//   if (hasMedia) {
+//     if (hasMedia.type === "photo") {
+//       await ctx.replyWithPhoto(hasMedia.fileId, {
+//         caption: messageText,
+//         reply_markup: keyboard,
+//       });
+//     } else if (hasMedia.type === "video") {
+//       await ctx.replyWithVideo(hasMedia.fileId, {
+//         caption: messageText,
+//         reply_markup: keyboard,
+//       });
+//     } else if (hasMedia.type === "animation") {
+//       await ctx.replyWithAnimation(hasMedia.fileId, {
+//         caption: messageText,
+//         reply_markup: keyboard,
+//       });
+//     }
+//     try {
+//       await ctx.deleteMessage();
+//     } catch (error) {
+//       console.error("Failed to delete message:", error);
+//     }
+//   } else {
+//     try {
+//       await ctx.editMessageText(messageText, {
+//         link_preview_options: {
+//           is_disabled: true,
+//         },
+//         reply_markup: keyboard,
+//       });
+//     } catch (error) {
+//       console.error("Failed to edit message:", error);
+//     }
+//   }
+// }
 
-export async function handleRemoveWebhook(ctx: Context, chatId: string) {
-  const result = await patchChatSettings(
-    ctx,
-    chatId,
-    {
-      settings: {
-        customWebhookUrl: null,
-      },
-    },
-    "✅ Webhook URL removed successfully!",
-    "❌ Failed to remove webhook URL"
-  );
-  try {
-    await ctx.deleteMessage();
-  } catch (error) {
-    console.error("Failed to delete message:", error);
-  }
-  return result;
-}
+// export async function handleRemoveWebhook(ctx: Context, chatId: string) {
+//   const result = await patchChatSettings(
+//     ctx,
+//     chatId,
+//     {
+//       settings: {
+//         customWebhookUrl: null,
+//       },
+//     },
+//     "✅ Webhook URL removed successfully!",
+//     "❌ Failed to remove webhook URL"
+//   );
+//   try {
+//     await ctx.deleteMessage();
+//   } catch (error) {
+//     console.error("Failed to delete message:", error);
+//   }
+//   return result;
+// }
 
 export async function handleRemoveMedia(ctx: Context, chatId: string) {
   const result = await patchChatSettings(
@@ -185,4 +185,36 @@ export async function handleRemoveMedia(ctx: Context, chatId: string) {
     console.error("Failed to delete message:", error);
   }
   return result;
+}
+
+export async function showThresholds(ctx: Context, chatId: string) {
+  const chatData = await fetchChatData(chatId);
+  const keyboard = new InlineKeyboard();
+
+  let messageText = "🎯 Thresholds\n\n";
+
+  if (chatData?.settings?.thresholds?.length) {
+    chatData.settings.thresholds.forEach((t: Threshold) => {
+      keyboard.text(`$${t.threshold}`, `a`).row();
+    });
+    messageText += "\n";
+  }
+
+  keyboard.text("➕ Add Threshold", `chat-set_threshold-amount`).row();
+  keyboard.text("Cancel", "cancel");
+
+  return ctx.reply(messageText, {
+    reply_markup: keyboard,
+  });
+}
+
+export async function showThresholdSetup(ctx: Context, amount: string) {
+  const keyboard = new InlineKeyboard();
+  keyboard
+    .text("➕ Add Media (Image/Video)", `chat-set_threshold-media_${amount}`)
+    .row()
+    .text("🔗 Set Custom Webhook", `chat-set_threshold-webhook_${amount}`)
+    .row();
+
+  return ctx.reply("Select an option:", { reply_markup: keyboard });
 }

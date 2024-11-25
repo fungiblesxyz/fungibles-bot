@@ -2,7 +2,8 @@ import { bot } from "./index";
 import { actionStore } from "./actions";
 import { Context } from "grammy";
 import { sendLogToChannel } from "../helpers/bot";
-import { fetchChats } from "../helpers/utils";
+import { fetchChats, fetchChatData } from "../helpers/utils";
+import { Threshold } from "../helpers/types";
 
 export async function getMatchingChats(userId: number) {
   const chats = await fetchChats();
@@ -61,4 +62,14 @@ export async function patchChatSettings(
     });
     return false;
   }
+}
+
+export async function mergeThreshold(chatId: string, newThreshold: Threshold) {
+  const chatData = await fetchChatData(chatId);
+  const thresholds = chatData?.settings?.thresholds ?? [];
+  const filteredThresholds = thresholds.filter(
+    (t: Threshold) =>
+      t?.threshold !== undefined && t.threshold !== newThreshold.threshold
+  );
+  return [...filteredThresholds, newThreshold];
 }
