@@ -260,7 +260,7 @@ async function handleBuyEvent(
 
       const message = await formatBuyMessage(chat, buyEventData);
 
-      if (chat.settings?.imageWebhookUrl && log.transactionHash) {
+      if (log.transactionHash) {
         const queryParams = {};
         const media = await getBuyMedia(chat, log.transactionHash, queryParams);
         if (media?.data && media.type) {
@@ -332,7 +332,9 @@ async function getBuyMedia(
       };
     } catch (error) {
       console.error("Error fetching media from webhook:", error);
-      sendLogToChannel(`Error fetching media from webhook: ${error}`);
+      sendLogToChannel(`Error fetching media from webhook: ${error}`, {
+        chatId: chat.id,
+      });
     }
   }
 
