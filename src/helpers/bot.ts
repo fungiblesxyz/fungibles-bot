@@ -1,5 +1,5 @@
 import { InputFile, Context } from "grammy";
-import { bot } from "../bot";
+import { bot, systemBot } from "../bot";
 import { fetchChats } from "./utils";
 import { PendingAction } from "./types";
 
@@ -143,7 +143,7 @@ export async function sendLogToChannel(
       "\\$1"
     );
 
-    await bot.api.sendMessage(
+    await systemBot.api.sendMessage(
       "-1002420548293",
       `${prefix}${chatInfo}${emoji} ${
         !options.type ? "Error Log:" : "Log:"

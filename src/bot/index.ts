@@ -21,12 +21,13 @@ import {
   sendMessageToChat,
 } from "../helpers/bot";
 
-if (!process.env.TELEGRAM_BOT_TOKEN) {
+if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_SYSTEM_BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
   process.exit(1);
 }
 
 export const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
+export const systemBot = new Bot(process.env.TELEGRAM_SYSTEM_BOT_TOKEN);
 
 const pendingActions = new Map<number, PendingAction>();
 
