@@ -296,6 +296,9 @@ async function handleChatMemberUpdate(ctx: Context) {
     case "member":
     case "administrator":
       try {
+        const chatData = await fetchChatData(update.chat.id.toString());
+        if (chatData?.info?.id) return;
+
         await sendMessageToChat(
           update.chat.id.toString(),
           `👋 Hey, I am FungiblesBot, your favorite ERC20i bot!`
