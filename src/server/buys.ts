@@ -24,33 +24,36 @@ const ERC20_BALANCE_ABI = parseAbiItem(
 
 let chats: ChatResponse;
 let ethUsdPrice: number;
+let unwatchSwaps: ReturnType<typeof client.watchContractEvent> | null = null;
 
 export async function refreshData() {
   try {
-    chats = await fetchChats();
     ethUsdPrice = await getEthUsdPrice(client);
+    const newChats = await fetchChats();
+    const filteredChats = Object.entries(newChats)
+      .filter(([_, chat]) => chat?.info?.id)
+      .reduce(
+        (acc, [key, chat]) => ({
+          ...acc,
+          [key]: chat,
+        }),
+        {}
+      ) as ChatResponse;
+
+    if (JSON.stringify(chats) !== JSON.stringify(filteredChats)) {
+      chats = filteredChats;
+      if (unwatchSwaps) {
+        unwatchSwaps();
+        await monitorBuys();
+      }
+    }
   } catch (error) {
     console.error("Failed to update chats:", error);
     sendLogToChannel(`Failed to update chats: ${error}`);
-    // Use previous chats data if available
-    if (!chats) {
-      chats = {};
-    }
   }
 }
 
 export async function monitorBuys() {
-  await refreshData();
-  chats = Object.entries(chats)
-    .filter(([_, chat]) => chat?.info?.id)
-    .reduce(
-      (acc, [key, chat]) => ({
-        ...acc,
-        [key]: chat,
-      }),
-      {}
-    ) as ChatResponse;
-
   if (ethUsdPrice === 0) {
     throw new Error("ETH price is 0");
   }
@@ -75,7 +78,7 @@ export async function monitorBuys() {
   );
   if (!poolTokens.length) return;
 
-  client.watchContractEvent({
+  unwatchSwaps = client.watchContractEvent({
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,

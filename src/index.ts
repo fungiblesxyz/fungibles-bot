@@ -14,14 +14,19 @@ bot.start().catch((err) => {
   }
 });
 
-// Start the server job
-export const refreshDataJob = new CronJob(
-  "*/20 * * * * *", // every 20 seconds
-  refreshData
-);
+async function start() {
+  // Start the server job
+  const refreshDataJob = new CronJob(
+    "*/20 * * * * *", // every 20 seconds
+    refreshData
+  );
 
-monitorBuys();
-refreshDataJob.start();
+  await refreshData();
+  monitorBuys();
+  refreshDataJob.start();
+}
+
+start();
 
 // // Start the agent job
 // export const callAgentJob = new CronJob(

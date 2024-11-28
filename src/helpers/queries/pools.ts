@@ -28,7 +28,7 @@ export async function getPools(
   try {
     const v3PoolPromises = FEE_TIERS.map(async (fee) => {
       try {
-        return await publicClient.readContract({
+        const poolAddress = await publicClient.readContract({
           address: UNISWAP_V3_FACTORY,
           abi: [
             {
@@ -46,9 +46,32 @@ export async function getPools(
           functionName: "getPool",
           args: [tokenAddress, WETH, fee],
         });
+
+        if (poolAddress === "0x0000000000000000000000000000000000000000") {
+          return { address: poolAddress, liquidity: 0n };
+        }
+
+        const liquidity = await publicClient.readContract({
+          address: poolAddress,
+          abi: [
+            {
+              inputs: [],
+              name: "liquidity",
+              outputs: [{ type: "uint128" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "liquidity",
+        });
+
+        return { address: poolAddress, liquidity };
       } catch (error) {
         console.error(`Failed to fetch pool for fee tier ${fee}:`, error);
-        return "0x0000000000000000000000000000000000000000";
+        return {
+          address: "0x0000000000000000000000000000000000000000",
+          liquidity: 0n,
+        };
       }
     });
 
@@ -57,9 +80,11 @@ export async function getPools(
       ...v3PoolPromises,
     ]);
 
-    const v3Pool = v3Pools.find(
-      (pool) => pool !== "0x0000000000000000000000000000000000000000"
-    );
+    const v3Pool = v3Pools
+      .filter(
+        (pool) => pool.address !== "0x0000000000000000000000000000000000000000"
+      )
+      .sort((a, b) => (b.liquidity > a.liquidity ? 1 : -1))[0]?.address;
 
     if (!v3Pool) {
       return null;
