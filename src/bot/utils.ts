@@ -4,6 +4,7 @@ import { Context } from "grammy";
 import { sendLogToChannel } from "../helpers/bot";
 import { fetchChats, fetchChatData } from "../helpers/utils";
 import { Threshold } from "../helpers/types";
+import { CHATS_API_URL, CHATS_API_TOKEN } from "../config";
 
 export async function getMatchingChats(userId: number) {
   const chats = await fetchChats();
@@ -35,12 +36,12 @@ export async function patchChatSettings(
   const messageRestart = "Do /start if you want to do something else.";
 
   try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`, {
+    const response = await fetch(`${CHATS_API_URL}/${chatId}`, {
       method: "PATCH",
       body: JSON.stringify(updateData),
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
+        Authorization: `Bearer ${CHATS_API_TOKEN}`,
       },
     });
 

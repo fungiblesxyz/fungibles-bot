@@ -1,6 +1,7 @@
 import { PublicClient, parseAbiItem } from "viem";
 import { ChatResponse } from "./types";
 import { sendLogToChannel } from "./bot";
+import { CHATS_API_URL } from "../config";
 
 export function shortenAddress(address: string, includeLink = false): string {
   const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -89,7 +90,7 @@ export async function getTokenHoldersCount(
 
 export async function fetchChats(): Promise<ChatResponse> {
   try {
-    const response = await fetch(process.env.CHATS_API_URL!);
+    const response = await fetch(CHATS_API_URL);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -105,7 +106,7 @@ export async function fetchChats(): Promise<ChatResponse> {
 export async function fetchChatData(chatId: string | number | undefined) {
   if (!chatId) return {};
   try {
-    const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`);
+    const response = await fetch(`${CHATS_API_URL}/${chatId}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

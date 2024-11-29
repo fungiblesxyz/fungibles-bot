@@ -14,6 +14,8 @@ import {
 import client from "../helpers/client";
 import { ChatResponse, ChatEntry, BuyEventData } from "../helpers/types";
 import { getStats } from "../helpers/queries/stats";
+import { BUYS_FROM_BLOCK_NUMBER } from "../config";
+
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
 );
@@ -82,9 +84,7 @@ export async function monitorBuys() {
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
-    fromBlock: process.env.BUYS_FROM_BLOCK_NUMBER
-      ? BigInt(process.env.BUYS_FROM_BLOCK_NUMBER)
-      : undefined,
+    fromBlock: BUYS_FROM_BLOCK_NUMBER,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);

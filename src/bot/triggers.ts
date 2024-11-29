@@ -1,5 +1,6 @@
 import { Context } from "grammy";
 import { sendLogToChannel, sendMessageToChat } from "../helpers/bot";
+import { CHATS_API_URL, CHATS_API_TOKEN } from "../config";
 
 export async function handleChatMemberUpdate(ctx: Context) {
   const update = ctx.myChatMember;
@@ -22,11 +23,11 @@ export async function handleChatMemberUpdate(ctx: Context) {
             type: "log",
           }
         );
-        const response = await fetch(process.env.CHATS_API_URL!, {
+        const response = await fetch(CHATS_API_URL, {
           method: "POST",
           body: JSON.stringify({ id: update.chat.id.toString() }),
           headers: {
-            Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
+            Authorization: `Bearer ${CHATS_API_TOKEN}`,
           },
         });
         if (!response.ok) {
@@ -51,15 +52,12 @@ export async function handleChatMemberUpdate(ctx: Context) {
             type: "log",
           }
         );
-        const response = await fetch(
-          `${process.env.CHATS_API_URL}/${update.chat.id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${process.env.CHATS_API_TOKEN}`,
-            },
-          }
-        );
+        const response = await fetch(`${CHATS_API_URL}/${update.chat.id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${CHATS_API_TOKEN}`,
+          },
+        });
         if (!response.ok) {
           const errorMessage = await response.text();
           throw new Error(
