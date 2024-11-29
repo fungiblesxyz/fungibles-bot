@@ -51,10 +51,7 @@ Select an action:`,
     {
       parse_mode: "Markdown",
       reply_markup: new InlineKeyboard()
-        .text(
-          `✏️ Edit token address (${chatData.info.symbol})`,
-          `chat-set_token`
-        )
+        .text(`✏️ Edit token address (${chatData.info.symbol})`, `chat-setup`)
         .row()
         .text(
           `Emoji: ${chatData.settings?.emoji ?? "Not set"}`,
