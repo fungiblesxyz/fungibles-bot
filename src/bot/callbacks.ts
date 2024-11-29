@@ -1,8 +1,10 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { PendingAction, ActionType, ChatEntry } from "../helpers/types";
-import { updateChatSettings, sendLogToChannel } from "../helpers/bot";
+import { ChatEntry, Threshold } from "../helpers/types";
+import { sendLogToChannel } from "../helpers/bot";
+import { patchChatSettings } from "./utils";
+import { fetchChatData } from "../helpers/utils";
 
-export async function handleSettingsCallback(
+export async function handleShowGroupList(
   ctx: Context,
   bot: Bot,
   matchingChats: string[]
@@ -21,7 +23,12 @@ export async function handleSettingsCallback(
     try {
       const chat = await bot.api.getChat(chatId);
       const chatName = chat.title ?? "Unknown Chat";
-      chatsMenu.text(chatName, `chat_${chatId}`).row();
+      const chatData = await fetchChatData(chatId);
+      if (!chatData?.info?.id) {
+        chatsMenu.text(chatName, `chat-setup#${chatId}`).row();
+      } else {
+        chatsMenu.text(chatName, `chat-settings#${chatId}`).row();
+      }
     } catch (error) {
       console.error(`Error fetching chat ${chatId}:`, error);
       sendLogToChannel(`Error fetching chat: ${error}`, {
@@ -37,41 +44,7 @@ export async function handleSettingsCallback(
   });
 }
 
-export async function handleChatEditCallback(
-  ctx: Context,
-  chatId: string,
-  pendingActions: Map<number, PendingAction>
-) {
-  if (!ctx.from) return;
-
-  const [, , action] = ctx.callbackQuery?.data?.split("_") ?? [];
-
-  const prompts: Record<ActionType, string> = {
-    token: "➡️ Send your token address",
-    emoji: "➡️ Send your preferred emoji",
-    imageWebhook:
-      "➡️ Send your image URL (must start with http:// or https://)",
-    minBuy:
-      "➡️ Send minimum buy amount in USD to trigger alerts (e.g., 100). Buys below this amount will be ignored.",
-    emojiStep: "➡️ Send emoji step amount in USD (e.g., 100).",
-    media: "➡️ Send your image or video directly to this chat",
-  };
-
-  pendingActions.set(ctx.from.id, {
-    chatId,
-    action: action as ActionType,
-    promptMessage: prompts[action as ActionType],
-  });
-
-  await ctx.editMessageText(prompts[action as ActionType], {
-    reply_markup: new InlineKeyboard().text("Cancel", "cancel"),
-  });
-}
-
-export async function handleEditSettingsCallback(
-  ctx: Context,
-  chatData: ChatEntry
-) {
+export async function showChatSettings(ctx: Context, chatData: ChatEntry) {
   ctx.editMessageText(
     `
 Select an action:`,
@@ -80,24 +53,24 @@ Select an action:`,
       reply_markup: new InlineKeyboard()
         .text(
           `✏️ Edit token address (${chatData.info.symbol})`,
-          `chat-edit_${chatData.id}_token`
+          `chat-set_token`
         )
         .row()
         .text(
           `Emoji: ${chatData.settings?.emoji ?? "Not set"}`,
-          `chat-edit_${chatData.id}_emoji`
+          `chat-set_emoji`
         )
         .row()
-        .text(`🖼 Manage Buy Media`, `chat-media_${chatData.id}`)
+        .text(`🖼 Manage Buy Media`, `chat-thresholds`)
         .row()
         .text(
           `📢 Min Alert Amount: $${chatData.settings?.minBuyAmount ?? "0"}`,
-          `chat-edit_${chatData.id}_minBuy`
+          `chat-set_minBuy`
         )
         .row()
         .text(
           `📶 Emoji Step Amount: $${chatData.settings?.emojiStepAmount ?? "0"}`,
-          `chat-edit_${chatData.id}_emojiStep`
+          `chat-set_emojiStep`
         )
         .row()
         .text("Cancel", "cancel"),
@@ -105,113 +78,9 @@ Select an action:`,
   );
 }
 
-export async function handleMediaCallback(
-  ctx: Context,
-  chatId: string,
-  chatData: ChatEntry
-) {
-  const webhookUrl = chatData.settings?.imageWebhookUrl;
-  const hasMedia = chatData.settings?.thresholds?.[0];
-
-  let messageText = " ";
-
-  if (webhookUrl) {
-    messageText += `Current URL: ${webhookUrl}\n`;
-  }
-  if (!hasMedia && !webhookUrl) {
-    messageText += "Choose an option:";
-  }
-
-  const keyboard = new InlineKeyboard();
-
-  if (!webhookUrl && !hasMedia) {
-    keyboard
-      .text("➕ Add Media (Image/Video)", `chat-edit_${chatId}_media`)
-      .row()
-      .text("🔗 Set Custom Webhook", `chat-edit_${chatId}_imageWebhook`)
-      .row();
-  } else if (webhookUrl) {
-    keyboard.text("❌ Remove URL", `chat-remove_${chatId}_webhook`);
-  } else if (hasMedia) {
-    keyboard.text("❌ Remove Media", `chat-remove_${chatId}_media`);
-  }
-
-  keyboard.text("Cancel", "cancel");
-
-  if (hasMedia) {
-    if (hasMedia.type === "photo") {
-      await ctx.replyWithPhoto(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    } else if (hasMedia.type === "video") {
-      await ctx.replyWithVideo(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    } else if (hasMedia.type === "animation") {
-      await ctx.replyWithAnimation(hasMedia.fileId, {
-        caption: messageText,
-        reply_markup: keyboard,
-      });
-    }
-    try {
-      await ctx.deleteMessage();
-    } catch (error) {
-      console.error("Failed to delete message:", error);
-    }
-  } else {
-    try {
-      await ctx.editMessageText(messageText, {
-        link_preview_options: {
-          is_disabled: true,
-        },
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      console.error("Failed to edit message:", error);
-    }
-  }
-}
-
-export async function handleSetupToken(
-  ctx: Context,
-  chatId: string,
-  pendingActions: Map<number, PendingAction>
-) {
-  if (!ctx.callbackQuery) return;
-
-  const withModifiedCallback = `${ctx.callbackQuery.data}_token`;
-  ctx.callbackQuery.data = withModifiedCallback;
-
-  return handleChatEditCallback(ctx, chatId, pendingActions);
-}
-
-export async function handleRemoveWebhook(ctx: Context, chatId: string) {
-  const result = await updateChatSettings(
-    ctx,
-    new Map(),
-    chatId,
-    {
-      settings: {
-        imageWebhookUrl: null,
-      },
-    },
-    "✅ Webhook URL removed successfully!",
-    "❌ Failed to remove webhook URL"
-  );
-  try {
-    await ctx.deleteMessage();
-  } catch (error) {
-    console.error("Failed to delete message:", error);
-  }
-  return result;
-}
-
 export async function handleRemoveMedia(ctx: Context, chatId: string) {
-  const result = await updateChatSettings(
+  const result = await patchChatSettings(
     ctx,
-    new Map(),
     chatId,
     {
       settings: {
@@ -227,4 +96,103 @@ export async function handleRemoveMedia(ctx: Context, chatId: string) {
     console.error("Failed to delete message:", error);
   }
   return result;
+}
+
+export async function showThresholds(ctx: Context, chatId: string) {
+  const chatData = await fetchChatData(chatId);
+  const keyboard = new InlineKeyboard();
+
+  let messageText = "🎯 Thresholds\n\n";
+
+  if (chatData?.settings?.thresholds?.length) {
+    chatData.settings.thresholds.forEach((t: Threshold, index: number) => {
+      keyboard.text(`$${t.threshold}`, `chat-threshold_${index}`).row();
+    });
+    messageText += "\n";
+  }
+
+  keyboard.text("➕ Add Threshold", `chat-set_threshold-amount`).row();
+  keyboard.text("Cancel", "cancel");
+
+  return ctx.reply(messageText, {
+    reply_markup: keyboard,
+  });
+}
+
+export async function showThreshold(
+  ctx: Context,
+  chatId: string,
+  index: string
+) {
+  const chatData = await fetchChatData(chatId);
+  const threshold = chatData.settings.thresholds[index];
+
+  const keyboard = new InlineKeyboard();
+
+  if (threshold.customWebhookUrl) {
+    keyboard.text("❌ Remove URL", `chat-threshold-remove_${index}`);
+  } else if (threshold.fileId) {
+    keyboard.text("❌ Remove Media", `chat-threshold-remove_${index}`);
+  }
+
+  keyboard.text("Cancel", "cancel");
+
+  try {
+    if (threshold.fileId) {
+      if (threshold.type === "photo") {
+        await ctx.replyWithPhoto(threshold.fileId, {
+          reply_markup: keyboard,
+        });
+      } else if (threshold.type === "video") {
+        await ctx.replyWithVideo(threshold.fileId, {
+          reply_markup: keyboard,
+        });
+      } else if (threshold.type === "animation") {
+        await ctx.replyWithAnimation(threshold.fileId, {
+          reply_markup: keyboard,
+        });
+      }
+    } else {
+      await ctx.reply(`Current Webhook URL: ${threshold.customWebhookUrl}\n`, {
+        link_preview_options: {
+          is_disabled: true,
+        },
+        reply_markup: keyboard,
+      });
+    }
+
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.error("Failed to reply:", error);
+  }
+}
+
+export async function showThresholdSetup(ctx: Context, amount: string) {
+  const keyboard = new InlineKeyboard();
+  keyboard
+    .text("➕ Add Media (Image/Video)", `chat-set_threshold-media_${amount}`)
+    .row()
+    .text("🔗 Set Custom Webhook", `chat-set_threshold-webhook_${amount}`)
+    .row();
+
+  return ctx.reply("Select an option:", { reply_markup: keyboard });
+}
+
+export async function handleRemoveThreshold(
+  ctx: Context,
+  chatId: string,
+  index: string
+) {
+  const chatData = await fetchChatData(chatId);
+  const thresholds = chatData.settings.thresholds.filter(
+    (_: Threshold, i: number) => i !== parseInt(index)
+  );
+
+  return patchChatSettings(
+    ctx,
+    chatId,
+    { settings: { thresholds } },
+    "✅ Threshold removed successfully!",
+    "❌ Failed to remove threshold"
+  );
 }

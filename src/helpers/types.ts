@@ -1,15 +1,18 @@
 export type ActionType =
-  | "token"
+  | "setup"
   | "emoji"
-  | "imageWebhook"
   | "minBuy"
   | "emojiStep"
-  | "media";
+  | "thresholdAmount"
+  | "thresholdMedia"
+  | "thresholdWebhook";
 
 export interface PendingAction {
+  callbackData: string;
   chatId: string;
   action: ActionType;
   promptMessage: string;
+  data?: any;
 }
 
 export interface TokenInfo {
@@ -32,16 +35,17 @@ export interface ChatEntry {
   pools?: Pools;
   settings?: {
     emoji?: string;
-    imageUrl?: string;
     minBuyAmount?: number;
     emojiStepAmount?: number;
-    thresholds?: {
-      threshold: number;
-      fileId: string;
-      type: "photo" | "video" | "animation";
-    }[];
-    imageWebhookUrl?: string;
+    thresholds?: Threshold[];
   };
+}
+
+export interface Threshold {
+  threshold: number;
+  fileId?: string;
+  customWebhookUrl?: string;
+  type?: "photo" | "video" | "animation";
 }
 
 export interface ChatResponse {
