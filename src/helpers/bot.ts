@@ -1,5 +1,6 @@
 import { InputFile } from "grammy";
 import { bot, systemBot } from "../bot";
+import { NODE_ENV, SYSTEM_CHAT_ID, SYSTEM_THREAD_ID } from "../config";
 
 export async function sendMessageToChat(
   chatId: string,
@@ -71,7 +72,7 @@ export async function sendLogToChannel(
   } = {}
 ) {
   try {
-    const prefix = process.env.NODE_ENV === "test" ? "[TEST] " : "";
+    const prefix = NODE_ENV === "test" ? "[TEST] " : "";
     const chatInfo = options.chatId ? `[Chat: ${options.chatId}] ` : "";
     const emoji = !options.type ? "🚨" : "📝";
 
@@ -82,13 +83,13 @@ export async function sendLogToChannel(
     );
 
     await systemBot.api.sendMessage(
-      "-1002420548293",
+      SYSTEM_CHAT_ID,
       `${prefix}${chatInfo}${emoji} ${
         !options.type ? "Error Log:" : "Log:"
       }\n${escapedMessage}`,
       {
         parse_mode: "Markdown",
-        message_thread_id: 2,
+        message_thread_id: SYSTEM_THREAD_ID,
       }
     );
   } catch (error) {

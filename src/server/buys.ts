@@ -14,6 +14,8 @@ import {
 import client from "../helpers/client";
 import { ChatResponse, ChatEntry, BuyEventData } from "../helpers/types";
 import { getStats } from "../helpers/queries/stats";
+import { BUYS_FROM_BLOCK_NUMBER } from "../config";
+
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
 );
@@ -82,9 +84,7 @@ export async function monitorBuys() {
     address: v3Pools as `0x${string}`[],
     abi: [UNISWAP_V3_POOL_ABI],
     pollingInterval: 5000,
-    fromBlock: process.env.BUYS_FROM_BLOCK_NUMBER
-      ? BigInt(process.env.BUYS_FROM_BLOCK_NUMBER)
-      : undefined,
+    fromBlock: BUYS_FROM_BLOCK_NUMBER,
     eventName: "Swap",
     onError: (error) => {
       console.error("There was an error watching the contract events", error);
@@ -128,11 +128,14 @@ export async function monitorBuys() {
 }
 
 async function formatBuyMessage(chat: ChatEntry, data: BuyEventData) {
-  const emojiCount = Math.max(
+  const rawEmojiCount = Math.max(
     1,
     Math.floor(data.amounts.spentUsd / (chat.settings?.emojiStepAmount ?? 10))
   );
   const baseEmoji = chat.settings?.emoji ?? "🟢";
+
+  const maxEmojiCount = Math.floor(700 / baseEmoji.length);
+  const emojiCount = Math.min(rawEmojiCount, maxEmojiCount);
   const emojiString = baseEmoji.repeat(emojiCount);
 
   const buyerPosition = `${_n(data.buyer.formattedBalance)} ${

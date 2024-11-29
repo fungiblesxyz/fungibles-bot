@@ -6,14 +6,10 @@ import { handleChatMemberUpdate } from "./triggers";
 import { handleStartCommand } from "./commands";
 import { handleShowGroupList } from "./callbacks";
 import { handleMessageSubmission } from "./submissions";
+import { TELEGRAM_BOT_TOKEN, TELEGRAM_SYSTEM_BOT_TOKEN } from "../config";
 
-if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_SYSTEM_BOT_TOKEN) {
-  console.error("TELEGRAM_BOT_TOKEN must be set in the environment.");
-  process.exit(1);
-}
-
-export const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
-export const systemBot = new Bot(process.env.TELEGRAM_SYSTEM_BOT_TOKEN);
+export const bot = new Bot(TELEGRAM_BOT_TOKEN);
+export const systemBot = new Bot(TELEGRAM_SYSTEM_BOT_TOKEN);
 
 bot.command("start", handleStartCommand);
 

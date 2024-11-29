@@ -1,6 +1,7 @@
 import { getDaysSince } from "../utils";
+import { THEGRAPH_API_KEY } from "../../config";
 
-const UNISWAP_V3_SUBGRAPH_URL = `https://gateway.thegraph.com/api/${process.env.THEGRAPH_API_KEY}/subgraphs/id/43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG`;
+const UNISWAP_V3_SUBGRAPH_URL = `https://gateway.thegraph.com/api/${THEGRAPH_API_KEY}/subgraphs/id/43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG`;
 
 const getLastSaleQueryString = (isWethToken0: boolean) => `
     query GetLatestSell($address: String!, $token: String!, $pool: String!) {
