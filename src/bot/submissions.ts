@@ -186,21 +186,21 @@ export async function handleThresholdMediaSubmission(
     return;
   }
 
-  //   return patchChatSettings(
-  //     ctx,
-  //     chatId,
-  //     {
-  //       settings: {
-  //         thresholds: [
-  //           {
-  //             threshold: 0,
-  //             fileId: mediaFileId,
-  //             type: mediaType,
-  //           },
-  //         ],
-  //       },
-  //     },
-  //     "✅ Media saved successfully!",
-  //     "❌ Failed to save media"
-  //   );
+  const newThreshold = {
+    threshold: Number(pendingAction.data),
+    fileId: mediaFileId,
+    type: mediaType,
+  };
+
+  return patchChatSettings(
+    ctx,
+    pendingAction.chatId,
+    {
+      settings: {
+        thresholds: await mergeThreshold(pendingAction.chatId, newThreshold),
+      },
+    },
+    "✅ Media saved successfully!",
+    "❌ Failed to save media"
+  );
 }

@@ -102,7 +102,8 @@ export async function fetchChats(): Promise<ChatResponse> {
   }
 }
 
-export async function fetchChatData(chatId: string) {
+export async function fetchChatData(chatId: string | number | undefined) {
+  if (!chatId) return {};
   try {
     const response = await fetch(`${process.env.CHATS_API_URL}/${chatId}`);
     if (!response.ok) {

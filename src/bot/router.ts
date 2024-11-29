@@ -5,6 +5,8 @@ import {
   handleRemoveMedia,
   showChatSettings,
   showThresholds,
+  showThreshold,
+  handleRemoveThreshold,
 } from "./callbacks";
 
 type CallbackHandler = (ctx: Context, ...args: string[]) => Promise<any>;
@@ -75,6 +77,18 @@ const routes: RouteConfig[] = [
     prefix: "chat-thresholds",
     handler: async (ctx, chatId) => {
       return showThresholds(ctx, chatId);
+    },
+  },
+  {
+    prefix: "chat-threshold-remove",
+    handler: async (ctx, chatId, index) => {
+      return handleRemoveThreshold(ctx, chatId, index);
+    },
+  },
+  {
+    prefix: "chat-threshold",
+    handler: async (ctx, chatId, index) => {
+      return showThreshold(ctx, chatId, index);
     },
   },
 ];
