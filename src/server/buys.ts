@@ -128,11 +128,14 @@ export async function monitorBuys() {
 }
 
 async function formatBuyMessage(chat: ChatEntry, data: BuyEventData) {
-  const emojiCount = Math.max(
+  const rawEmojiCount = Math.max(
     1,
     Math.floor(data.amounts.spentUsd / (chat.settings?.emojiStepAmount ?? 10))
   );
   const baseEmoji = chat.settings?.emoji ?? "🟢";
+
+  const maxEmojiCount = Math.floor(700 / baseEmoji.length);
+  const emojiCount = Math.min(rawEmojiCount, maxEmojiCount);
   const emojiString = baseEmoji.repeat(emojiCount);
 
   const buyerPosition = `${_n(data.buyer.formattedBalance)} ${
