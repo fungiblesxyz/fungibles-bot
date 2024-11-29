@@ -273,19 +273,11 @@ async function handleBuyEvent(
           spentAmountUsd
         );
         if (media?.data && media.type) {
-          await sendMediaToChat(
-            chat.id,
-            media.data,
-            media.type,
-            message,
-            chat.threadId
-          );
+          await sendMediaToChat(chat.id, media.data, media.type, message);
         } else {
-          await sendMessageToChat(chat.id, message, chat.threadId);
+          await sendMessageToChat(chat.id, message);
         }
-      } else {
-        await sendMessageToChat(chat.id, message, chat.threadId);
-      }
+      } 
     }
   } catch (error) {
     console.error(`Error handling buy event: ${error}`, {
