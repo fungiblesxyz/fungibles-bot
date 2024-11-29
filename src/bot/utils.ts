@@ -1,4 +1,4 @@
-import { bot } from "./index";
+import { bot } from "../helpers/bot";
 import { actionStore } from "./actions";
 import { Context } from "grammy";
 import { sendLogToChannel } from "../helpers/bot";
