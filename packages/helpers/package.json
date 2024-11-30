@@ -2,13 +2,44 @@
   "name": "@bot/helpers",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "build": "tsc"
+  },
   "exports": {
-    "./bot": "./bot.ts",
-    "./queries/pools": "./queries/pools.ts",
-    "./queries/stats": "./queries/stats.ts",
-    "./types": "./types.ts",
-    "./utils": "./utils.ts",
-    "./client": "./client.ts",
-    "./config": "./config.ts"
+    "./bot": {
+      "import": "./dist/bot.js",
+      "require": "./dist/bot.js",
+      "default": "./bot.ts"
+    },
+    "./queries/pools": {
+      "import": "./dist/queries/pools.js",
+      "require": "./dist/queries/pools.js",
+      "default": "./queries/pools.ts"
+    },
+    "./queries/stats": {
+      "import": "./dist/queries/stats.js",
+      "require": "./dist/queries/stats.js",
+      "default": "./queries/stats.ts"
+    },
+    "./types": {
+      "import": "./dist/types.js",
+      "require": "./dist/types.js",
+      "default": "./types.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.js",
+      "default": "./types.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "require": "./dist/client.js",
+      "default": "./client.ts"
+    },
+    "./config": {
+      "import": "./dist/config.js",
+      "require": "./dist/config.js",
+      "default": "./config.ts"
+    }
   }
 }

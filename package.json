@@ -2,14 +2,22 @@
   "name": "bot",
   "private": true,
   "scripts": {
+    "build": "turbo build",
     "dev": "turbo dev",
-    "build": "turbo build"
+    "start:server": "yarn workspace @bot/server start",
+    "start:bot": "yarn workspace @bot/bot start"
   },
   "devDependencies": {
-    "turbo": "^2.3.3"
+    "@eslint/js": "^9.1.1",
+    "@types/node": "^20.12.7",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.1.1",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.7.1"
   },
   "workspaces": [
-    "apps/*",
     "packages/*"
   ],
   "packageManager": "yarn@1.22.19"
