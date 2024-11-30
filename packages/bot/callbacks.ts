@@ -1,8 +1,8 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { ChatEntry, Threshold } from "../helpers/types";
-import { sendLogToChannel } from "../helpers/bot";
+import { ChatEntry, Threshold } from "@bot/helpers/types";
+import { sendLogToChannel } from "@bot/helpers/bot";
+import { fetchChatData } from "@bot/helpers/utils";
 import { patchChatSettings } from "./utils";
-import { fetchChatData } from "../helpers/utils";
 
 export async function handleShowGroupList(
   ctx: Context,

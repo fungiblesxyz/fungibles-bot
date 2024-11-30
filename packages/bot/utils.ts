@@ -1,14 +1,13 @@
-import { bot } from "../helpers/bot";
-import { actionStore } from "./actions";
 import { Context } from "grammy";
-import { sendLogToChannel } from "../helpers/bot";
-import { fetchChats, fetchChatData } from "../helpers/utils";
-import { Threshold } from "../helpers/types";
-import { CHATS_API_URL, CHATS_API_TOKEN } from "../config";
+import { bot, sendLogToChannel } from "@bot/helpers/bot";
+import { CHATS_API_URL, CHATS_API_TOKEN } from "@bot/helpers/config";
+import { fetchChats, fetchChatData } from "@bot/helpers/utils";
+import { Threshold } from "@bot/helpers/types";
+import { actionStore } from "./actions";
 
 export async function getMatchingChats(userId: number) {
   const chats = await fetchChats();
-  const matchingChats = [];
+  const matchingChats: string[] = [];
 
   for (const chatId of Object.keys(chats)) {
     try {

@@ -1,11 +1,12 @@
 import { Context, InlineKeyboard } from "grammy";
 import { isAddress, getAddress } from "viem";
-import client from "../helpers/client";
-import { getPools } from "../helpers/queries/pools";
+import { getPools } from "@bot/helpers/queries/pools";
+import client from "@bot/helpers/client";
+import { PendingAction } from "@bot/helpers/types";
 import { patchChatSettings, mergeThreshold } from "./utils";
 import { actionStore } from "./actions";
 import { showThresholdSetup } from "./callbacks";
-import { PendingAction } from "../helpers/types";
+
 export async function handleMessageSubmission(ctx: Context) {
   if (!ctx.from) return;
   const pendingAction = actionStore.getPendingAction(ctx.from.id);

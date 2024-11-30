@@ -1,0 +1,26 @@
+{
+  "name": "@bot/server",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e ../../.env.test nodemon --exec ts-node index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@bot/helpers": "*",
+    "cron": "^3.1.7",
+    "viem": "^2.10.9",
+    "grammy": "^1.23.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.1.1",
+    "@types/node": "^20.12.7",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.1.1",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.7.1"
+  }
+}

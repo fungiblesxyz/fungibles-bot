@@ -1,6 +1,6 @@
 import { Context } from "grammy";
-import { sendLogToChannel, sendMessageToChat } from "../helpers/bot";
-import { CHATS_API_URL, CHATS_API_TOKEN } from "../config";
+import { sendLogToChannel, sendMessageToChat } from "@bot/helpers/bot";
+import { CHATS_API_URL, CHATS_API_TOKEN } from "@bot/helpers/config";
 
 export async function handleChatMemberUpdate(ctx: Context) {
   const update = ctx.myChatMember;

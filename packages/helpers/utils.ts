@@ -1,7 +1,7 @@
 import { PublicClient, parseAbiItem } from "viem";
 import { ChatResponse } from "./types";
 import { sendLogToChannel } from "./bot";
-import { CHATS_API_URL } from "../config";
+import { CHATS_API_URL } from "./config";
 
 export function shortenAddress(address: string, includeLink = false): string {
   const shortened = `${address.slice(0, 6)}...${address.slice(-4)}`;

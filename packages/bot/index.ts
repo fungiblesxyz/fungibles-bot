@@ -1,3 +1,4 @@
+import { bot } from "@bot/helpers/bot";
 import { actionStore } from "./actions";
 import { getMatchingChats } from "./utils";
 import { handleRouteCallback } from "./router";
@@ -5,7 +6,6 @@ import { handleChatMemberUpdate } from "./triggers";
 import { handleStartCommand } from "./commands";
 import { handleShowGroupList } from "./callbacks";
 import { handleMessageSubmission } from "./submissions";
-import { bot } from "../helpers/bot";
 
 bot.start().catch((err) => {
   if (err.error_code === 409) {

@@ -5,7 +5,7 @@ import {
   SYSTEM_THREAD_ID,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_SYSTEM_BOT_TOKEN,
-} from "../config";
+} from "./config";
 
 export const bot = new Bot(TELEGRAM_BOT_TOKEN);
 export const systemBot = new Bot(TELEGRAM_SYSTEM_BOT_TOKEN);

@@ -1,20 +1,20 @@
 import { parseAbiItem, formatUnits } from "viem";
-import client from "../helpers/client";
-import { ChatResponse, ChatEntry, BuyEventData } from "../helpers/types";
-import { getStats } from "../helpers/queries/stats";
-import { BUYS_FROM_BLOCK_NUMBER } from "../config";
+import { BUYS_FROM_BLOCK_NUMBER } from "@bot/helpers/config";
+import client from "@bot/helpers/client";
+import { getStats } from "@bot/helpers/queries/stats";
+import { ChatResponse, ChatEntry, BuyEventData } from "@bot/helpers/types";
 import {
   sendMediaToChat,
   sendMessageToChat,
   sendLogToChannel,
-} from "../helpers/bot";
+} from "@bot/helpers/bot";
 import {
   shortenAddress,
   convertToPositive,
   _n,
   getEthUsdPrice,
   fetchChats,
-} from "../helpers/utils";
+} from "@bot/helpers/utils";
 
 const UNISWAP_V3_POOL_ABI = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)"
@@ -277,7 +277,7 @@ async function handleBuyEvent(
         } else {
           await sendMessageToChat(chat.id, message);
         }
-      } 
+      }
     }
   } catch (error) {
     console.error(`Error handling buy event: ${error}`, {

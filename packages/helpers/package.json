@@ -1,0 +1,14 @@
+{
+  "name": "@bot/helpers",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./bot": "./bot.ts",
+    "./queries/pools": "./queries/pools.ts",
+    "./queries/stats": "./queries/stats.ts",
+    "./types": "./types.ts",
+    "./utils": "./utils.ts",
+    "./client": "./client.ts",
+    "./config": "./config.ts"
+  }
+}

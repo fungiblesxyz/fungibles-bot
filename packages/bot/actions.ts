@@ -1,5 +1,5 @@
-import { PendingAction, ActionType } from "../helpers/types";
 import { Context, InlineKeyboard } from "grammy";
+import { PendingAction, ActionType } from "@bot/helpers/types";
 
 const PROMPT_MESSAGES: Record<ActionType, string> = {
   setup: "➡️ Send your token address",

@@ -1,5 +1,5 @@
 import { getDaysSince } from "../utils";
-import { THEGRAPH_API_KEY } from "../../config";
+import { THEGRAPH_API_KEY } from "../config";
 
 const UNISWAP_V3_SUBGRAPH_URL = `https://gateway.thegraph.com/api/${THEGRAPH_API_KEY}/subgraphs/id/43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG`;
 
