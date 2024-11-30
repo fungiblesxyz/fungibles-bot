@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "dotenv -e ../../.env.test nodemon --exec ts-node index.ts",
     "build": "tsc",
-    "start": "dotenv -e ../../.env node dist/index.js"
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@bot/helpers": "*",
