@@ -1,5 +1,5 @@
 import { Context } from "grammy";
-import { fetchChatData } from "../helpers/utils";
+import { fetchChatData } from "@bot/helpers/utils";
 import { actionStore } from "./actions";
 import {
   handleRemoveMedia,

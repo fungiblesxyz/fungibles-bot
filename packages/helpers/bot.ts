@@ -1,6 +1,14 @@
-import { InputFile } from "grammy";
-import { bot, systemBot } from "../bot";
-import { NODE_ENV, SYSTEM_CHAT_ID, SYSTEM_THREAD_ID } from "../config";
+import { InputFile, Bot } from "grammy";
+import {
+  NODE_ENV,
+  SYSTEM_CHAT_ID,
+  SYSTEM_THREAD_ID,
+  TELEGRAM_BOT_TOKEN,
+  TELEGRAM_SYSTEM_BOT_TOKEN,
+} from "./config";
+
+export const bot = new Bot(TELEGRAM_BOT_TOKEN);
+export const systemBot = new Bot(TELEGRAM_SYSTEM_BOT_TOKEN);
 
 export async function sendMessageToChat(
   chatId: string,

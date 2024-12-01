@@ -30,7 +30,6 @@ export interface Pools {
 
 export interface ChatEntry {
   id: string;
-  threadId?: number;
   info: TokenInfo;
   pools?: Pools;
   settings?: {

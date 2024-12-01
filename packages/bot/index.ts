@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { bot } from "@bot/helpers/bot";
 import { actionStore } from "./actions";
 import { getMatchingChats } from "./utils";
 import { handleRouteCallback } from "./router";
@@ -6,10 +6,14 @@ import { handleChatMemberUpdate } from "./triggers";
 import { handleStartCommand } from "./commands";
 import { handleShowGroupList } from "./callbacks";
 import { handleMessageSubmission } from "./submissions";
-import { TELEGRAM_BOT_TOKEN, TELEGRAM_SYSTEM_BOT_TOKEN } from "../config";
 
-export const bot = new Bot(TELEGRAM_BOT_TOKEN);
-export const systemBot = new Bot(TELEGRAM_SYSTEM_BOT_TOKEN);
+bot.start().catch((err) => {
+  if (err.error_code === 409) {
+    console.warn("Warning: Another bot instance may be running");
+  } else {
+    console.error("Bot startup error:", err);
+  }
+});
 
 bot.command("start", handleStartCommand);
 

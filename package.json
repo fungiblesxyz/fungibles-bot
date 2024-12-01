@@ -1,13 +1,11 @@
 {
-  "name": "cs-bot",
-  "version": "0.0.1",
-  "description": "Contract scanner",
-  "author": "Sam <samuv.eth@gmail.com>",
-  "license": "MIT",
+  "name": "bot",
+  "private": true,
   "scripts": {
-    "dev": "dotenv -e .env.test nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
-    "start": "node dist"
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "start:server": "yarn workspace @bot/server start",
+    "start:bot": "yarn workspace @bot/bot start"
   },
   "devDependencies": {
     "@eslint/js": "^9.1.1",
@@ -15,16 +13,12 @@
     "dotenv": "^16.4.5",
     "eslint": "^9.1.1",
     "ts-node": "^10.9.2",
+    "turbo": "^2.3.3",
     "typescript": "^5.4.5",
-    "typescript-eslint": "^7.7.1",
-    "vitest": "^2.1.6"
+    "typescript-eslint": "^7.7.1"
   },
-  "dependencies": {
-    "@grammyjs/conversations": "^1.2.0",
-    "@resvg/resvg-js": "^2.6.2",
-    "cron": "^3.1.7",
-    "grammy": "^1.23.0",
-    "openai": "^4.73.0",
-    "viem": "^2.10.9"
-  }
+  "workspaces": [
+    "packages/*"
+  ],
+  "packageManager": "yarn@1.22.19"
 }

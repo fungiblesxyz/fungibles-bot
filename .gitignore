@@ -3,6 +3,7 @@ node_modules/
 /.pnp
 .pnp.js
 .yarn/
+.turbo
 yarn-debug.log*
 yarn-error.log*
 
@@ -15,8 +16,7 @@ yarn-error.log*
 .env.test
 
 # Build outputs
-/build
-/dist
+/packages/**/dist
 /.next
 /out
 
