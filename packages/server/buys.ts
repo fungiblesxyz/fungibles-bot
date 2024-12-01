@@ -301,6 +301,8 @@ async function getBuyMedia(
     .filter((t) => t.threshold <= spentUsd)
     .sort((a, b) => b.threshold - a.threshold)[0];
 
+  if (!appropriateThreshold) return null;
+
   if (appropriateThreshold && !appropriateThreshold.customWebhookUrl) {
     return {
       data: appropriateThreshold.fileId,
