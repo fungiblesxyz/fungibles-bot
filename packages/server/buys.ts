@@ -149,7 +149,7 @@ async function formatBuyMessage(chat: ChatEntry, data: BuyEventData) {
   );
 
   let buyerStatus;
-  if (heldForDays < 7) buyerStatus = "🌟 New Buyer";
+  if (heldForDays < 7 || !heldForDays) buyerStatus = "🌟 New Buyer";
   if (heldForDays >= 7) buyerStatus = "🦾 Iron Hands";
   if (heldForDays >= 30) buyerStatus = "💎 Diamond Hands";
   if (data.buyer.balance <= 0) buyerStatus = "⚡ Quick Flip";
