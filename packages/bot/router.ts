@@ -31,6 +31,12 @@ const routes: RouteConfig[] = [
     },
   },
   {
+    prefix: "chat-set_emojiStep",
+    handler: async (ctx) => {
+      return actionStore.setPendingAction(ctx, "emojiStep");
+    },
+  },
+  {
     prefix: "chat-set_emoji",
     handler: async (ctx) => {
       return actionStore.setPendingAction(ctx, "emoji");
@@ -40,12 +46,6 @@ const routes: RouteConfig[] = [
     prefix: "chat-set_minBuy",
     handler: async (ctx) => {
       return actionStore.setPendingAction(ctx, "minBuy");
-    },
-  },
-  {
-    prefix: "chat-set_emojiStep",
-    handler: async (ctx) => {
-      return actionStore.setPendingAction(ctx, "emojiStep");
     },
   },
   {
