@@ -1,6 +1,7 @@
 import { Context } from "grammy";
 import { sendLogToChannel, sendMessageToChat } from "@bot/helpers/bot";
 import { CHATS_API_URL, CHATS_API_TOKEN } from "@bot/helpers/config";
+import { fetchChatData } from "@bot/helpers/utils";
 
 export async function handleChatMemberUpdate(ctx: Context) {
   const update = ctx.myChatMember;
@@ -13,6 +14,13 @@ export async function handleChatMemberUpdate(ctx: Context) {
     case "member":
     case "administrator":
       try {
+        const chatData = await fetchChatData(update.chat.id);
+        if (chatData?.id) {
+          sendLogToChannel(`Chat ${update.chat.id} changed status`, {
+            type: "log",
+          });
+          return;
+        }
         await sendMessageToChat(
           update.chat.id.toString(),
           `👋 Hey, I am FungiblesBot, your favorite ERC20i bot!`
