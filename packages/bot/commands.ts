@@ -1,4 +1,6 @@
 import { InlineKeyboard, Context } from "grammy";
+import { getTokenHoldersCount, fetchChatData } from "@bot/helpers/utils";
+import client from "@bot/helpers/client";
 
 export async function handleStartCommand(ctx: Context) {
   if (ctx.chat?.type !== "private") {
@@ -45,4 +47,26 @@ To get started, add me to your group and configure token tracking settings!
       },
     }
   );
+}
+
+export async function handleBuyerStatusCommand(ctx: Context) {
+  console.log("🚀 ~ handleBuyerStatusCommand ~ ctx:", ctx);
+  if (ctx.chat?.type === "private") {
+    return ctx.reply(
+      "⚠️ This command can only be used in groups where I'm monitoring a token!"
+    );
+  }
+
+  let statusMessage = "";
+
+  // Add buyer status classification info
+  statusMessage += "\n*Buyer Status Tiers:*\n\n";
+  statusMessage += "🌟 *New Buyer*: Holding for less than 7 days\n";
+  statusMessage += "🦾 *Iron Hands*: Holding for 7-29 days\n";
+  statusMessage += "💎 *Diamond Hands*: Holding for 30+ days\n";
+  statusMessage += "⚡ *Quick Flip*: Possible arbitrage transaction\n";
+
+  return ctx.reply(statusMessage, {
+    parse_mode: "Markdown",
+  });
 }

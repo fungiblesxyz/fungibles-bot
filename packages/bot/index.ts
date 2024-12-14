@@ -3,7 +3,7 @@ import { actionStore } from "./actions";
 import { getMatchingChats } from "./utils";
 import { handleRouteCallback } from "./router";
 import { handleChatMemberUpdate } from "./triggers";
-import { handleStartCommand } from "./commands";
+import { handleStartCommand, handleBuyerStatusCommand } from "./commands";
 import { handleShowGroupList } from "./callbacks";
 import { handleMessageSubmission } from "./submissions";
 
@@ -16,6 +16,7 @@ bot.start().catch((err) => {
 });
 
 bot.command("start", handleStartCommand);
+bot.command("bstatus", handleBuyerStatusCommand);
 
 bot.on("callback_query:data", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
