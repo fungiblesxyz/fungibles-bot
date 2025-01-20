@@ -3,9 +3,10 @@ import { base } from "viem/chains";
 
 const client = createPublicClient({
   chain: base,
-  transport: http(
-    "https://api.developer.coinbase.com/rpc/v1/base/HGhJ7LjQj9AFXDwVbVinHj5yIYEsuhUu"
-  ),
+  transport: [
+    http("https://base.llamarpc.com"),
+    http("https://1rpc.io/base")
+  ]
 }) as PublicClient;
 
 export default client;
