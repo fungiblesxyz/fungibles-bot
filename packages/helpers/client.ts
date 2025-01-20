@@ -4,7 +4,7 @@ import { base } from "viem/chains";
 const client = createPublicClient({
   chain: base,
   transport: http(
-    "https://rpc.ankr.com/base/a889495c40c52cceed37f260717b69733a0096a76216e1b8817651ab0d9aac94"
+    "https://api.developer.coinbase.com/rpc/v1/base/HGhJ7LjQj9AFXDwVbVinHj5yIYEsuhUu"
   ),
 }) as PublicClient;
 
